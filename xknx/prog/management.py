@@ -81,3 +81,15 @@ class NetworkManagement:
         await asyncio.sleep(1)
         await device.t_disconnect()
         return NM_OK
+
+    async def switch_led(self, ind_add, value):
+        # define device
+        device = ProgDevice(self.xknx, ind_add)
+        self.reg_dev[ind_add] = device
+        
+        # check if device present
+        if not await self.is_device_present(device):
+            return NM_NOT_EXISTS
+        
+        if value == 1:
+            await device.devicedescriptor_read(0xc)
