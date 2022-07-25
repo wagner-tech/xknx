@@ -48,7 +48,8 @@ class ProgDevice:
         self.xknx = xknx
         self.ind_add = ind_add
         self.group_address_type = group_address_type
-        self.last_telegram: Telegram | None = None
+        self.last_telegram = list()
+        self.sequence_number = 0
 
     async def process_telegram(self, telegram: Telegram) -> None:
         """Process a telegram."""
@@ -56,6 +57,8 @@ class ProgDevice:
         if telegram.payload:
             if telegram.payload.CODE == APCIService.DEVICE_DESCRIPTOR_RESPONSE:
                 await self.t_ack()
+            if telegram.payload.CODE == APCIService.MEMORY_RESPONSE:
+                await self.t_ack(True)
             if telegram.payload.CODE == APCIExtendedService.PROPERTY_VALUE_RESPONSE:
                 await self.t_ack(True)
 
@@ -110,9 +113,10 @@ class ProgDevice:
         telegram = Telegram(
             self.ind_add,
             TelegramDirection.OUTGOING,
-            DeviceDescriptorRead(descriptor, is_numbered=True),
+            DeviceDescriptorRead(descriptor, sequence_number = self.sequence_number),
             priority=Priority.SYSTEM,
         )
+        self.sequence_number += 1
         await self.xknx.telegrams.put(telegram)
 
     async def devicedescriptor_read_response(self, descriptor: int) -> None:
@@ -134,16 +138,6 @@ class ProgDevice:
             self.ind_add,
             TelegramDirection.OUTGOING,
             PropertyValueRead(0, 0x0B, 1, 1, True, 1),
-            priority=Priority.SYSTEM,
-        )
-        await self.xknx.telegrams.put(telegram)
-
-    async def memory_read(self, address: int = 0, count: int = 0) -> None:
-        """Perform a PropertyValue_Read."""
-        telegram = Telegram(
-            self.ind_add,
-            TelegramDirection.OUTGOING,
-            MemoryRead(address, count),
             priority=Priority.SYSTEM,
         )
         await self.xknx.telegrams.put(telegram)
@@ -180,6 +174,36 @@ class ProgDevice:
             priority=Priority.SYSTEM,
         )
         await self.xknx.telegrams.put(telegram)
+
+    async def memory_read(self, address: int = 0, count: int = 0, is_numbered = False) -> None:
+        """Perform a PropertyValue_Read."""
+        if is_numbered:
+            mr = MemoryRead(address, count, sequence_number = self.sequence_number)
+        else:
+            mr = MemoryRead(address, count)
+        telegram = Telegram(
+            self.ind_add,
+            TelegramDirection.OUTGOING,
+            mr,
+            priority=Priority.SYSTEM,
+        )
+        await self.xknx.telegrams.put(telegram)
+
+    async def memory_read_response(self, address: int = 0, count: int = 0) -> None:
+        """Process a DeviceDescriptor_Read_Response."""
+        await self.memory_read(address, count, True)
+        while True:
+            await asyncio.sleep(0.1)
+            if self.last_telegram:
+                if self.last_telegram.payload:
+                    if (
+                        self.last_telegram.payload.CODE
+                        == APCIService.MEMORY_RESPONSE
+                    ):
+                        return ( self.last_telegram.payload.address, 
+                                 self.last_telegram.payload.count,
+                                 self.last_telegram.payload.data
+                        )
 
     async def restart(self) -> None:
         """Perform a Restart."""

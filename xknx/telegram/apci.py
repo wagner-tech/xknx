@@ -509,10 +509,14 @@ class MemoryRead(APCI):
 
     CODE = APCIService.MEMORY_READ
 
-    def __init__(self, address: int = 0, count: int = 0) -> None:
+    def __init__(self, address: int = 0, count: int = 0, sequence_number: int = None) -> None:
         """Initialize a new instance of MemoryRead."""
         self.address = address
         self.count = count
+        self.additional_flags = None
+        self.sequence_number = sequence_number
+        if self.sequence_number:
+            self.additional_flags = APCIAdditionalFlags.NUMBERED_DATA_PACKET
 
     def calculated_length(self) -> int:
         """Get length of APCI payload."""
@@ -534,7 +538,11 @@ class MemoryRead(APCI):
         payload = struct.pack("!BH", self.count, self.address)
 
         return encode_cmd_and_payload(
-            self.CODE, encoded_payload=payload[0], appended_payload=payload[1:]
+            self.CODE, 
+            encoded_payload=payload[0], 
+            appended_payload=payload[1:],
+            additional_flags=self.additional_flags,
+            sequence_number=self.sequence_number,
         )
 
     def __str__(self) -> str:
@@ -655,12 +663,12 @@ class DeviceDescriptorRead(APCI):
 
     CODE = APCIService.DEVICE_DESCRIPTOR_READ
 
-    def __init__(self, descriptor: int = 0, is_numbered: bool = False) -> None:
+    def __init__(self, descriptor: int = 0, sequence_number:int = 0) -> None:
         """Initialize a new instance of DeviceDescriptorRead."""
         self.descriptor = descriptor
         self.additional_flags = None
-        if is_numbered:
-            self.additional_flags = APCIAdditionalFlags.NUMBERED_DATA_PACKET
+        self.sequence_number = sequence_number
+        self.additional_flags = APCIAdditionalFlags.NUMBERED_DATA_PACKET
 
     def calculated_length(self) -> int:
         """Get length of APCI payload."""
@@ -679,6 +687,7 @@ class DeviceDescriptorRead(APCI):
             self.CODE,
             encoded_payload=self.descriptor,
             additional_flags=self.additional_flags,
+            sequence_number=self.sequence_number,
         )
 
     def __str__(self) -> str:
@@ -706,6 +715,7 @@ class DeviceDescriptorResponse(APCI):
 
     def from_knx(self, raw: bytes) -> None:
         """Parse/deserialize from KNX/IP raw data."""
+        print (len(raw), raw, raw[0], raw[1])
         self.descriptor, self.value = struct.unpack("!BH", raw[1:])
 
         self.descriptor = self.descriptor & 0x3F

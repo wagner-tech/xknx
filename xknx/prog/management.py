@@ -92,4 +92,6 @@ class NetworkManagement:
             return NM_NOT_EXISTS
         
         if value == 1:
-            await device.devicedescriptor_read(0xc)
+            resp = await device.memory_read_response(96, 1)
+            print (f"resp = {resp}")
+            
