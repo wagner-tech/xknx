@@ -20,6 +20,7 @@ from xknx.telegram.apci import (
     IndividualAddressRead,
     IndividualAddressWrite,
     MemoryRead,
+    MemoryWrite,
     PropertyValueRead,
     Restart,
 )
@@ -179,6 +180,7 @@ class ProgDevice:
         """Perform a PropertyValue_Read."""
         if is_numbered:
             mr = MemoryRead(address, count, sequence_number = self.sequence_number)
+            self.sequence_number += 1
         else:
             mr = MemoryRead(address, count)
         telegram = Telegram(
@@ -204,6 +206,21 @@ class ProgDevice:
                                  self.last_telegram.payload.count,
                                  self.last_telegram.payload.data
                         )
+
+    async def memory_write(self, address: int = 0, count: int = 0, data: bytes = None, is_numbered = False) -> None:
+        """Perform a PropertyValue_Write"""
+        if is_numbered:
+            mw = MemoryWrite(address, count, data, sequence_number = self.sequence_number)
+            self.sequence_number += 1
+        else:
+            mw = MemoryWrite(address, count, data)
+        telegram = Telegram(
+            self.ind_add,
+            TelegramDirection.OUTGOING,
+            mw,
+            priority=Priority.SYSTEM,
+        )
+        await self.xknx.telegrams.put(telegram)
 
     async def restart(self) -> None:
         """Perform a Restart."""

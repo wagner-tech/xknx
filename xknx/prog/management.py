@@ -91,7 +91,22 @@ class NetworkManagement:
         if not await self.is_device_present(device):
             return NM_NOT_EXISTS
         
-        if value == 1:
+        if value == 0:
             resp = await device.memory_read_response(96, 1)
-            print (f"resp = {resp}")
-            
+            print (f"resp[2] = {resp[2]}")
+            if resp[2] == b'\x81':
+                # LED on
+                await device.memory_write(96, 1, b'\x00', True)
+                print ("LED ausgeschaltet.")
+            else:
+                print ("LED brennt nicht.")
+        elif value == 1:
+            resp = await device.memory_read_response(96, 1)
+            if resp[2] == b'\x00':
+                # LED off
+                await device.memory_write(96, 1, b'\x81', True)
+                print ("LED eingeschaltet.")
+            else:
+                print ("LED brennt schon.")
+        else:
+            raise RuntimeError("value parameter must be 0 or 1.")

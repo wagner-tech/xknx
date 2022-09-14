@@ -560,7 +560,7 @@ class MemoryWrite(APCI):
     CODE = APCIService.MEMORY_WRITE
 
     def __init__(
-        self, address: int = 0, count: int = 0, data: bytes | None = None
+        self, address: int = 0, count: int = 0, data: bytes | None = None, sequence_number: int = None
     ) -> None:
         """Initialize a new instance of MemoryWrite."""
 
@@ -570,6 +570,10 @@ class MemoryWrite(APCI):
         self.address = address
         self.count = count
         self.data = data
+        self.additional_flags = None
+        self.sequence_number = sequence_number
+        if self.sequence_number:
+            self.additional_flags = APCIAdditionalFlags.NUMBERED_DATA_PACKET
 
     def calculated_length(self) -> int:
         """Get length of APCI payload."""
@@ -594,7 +598,10 @@ class MemoryWrite(APCI):
         payload = struct.pack(f"!BH{size}s", self.count, self.address, self.data)
 
         return encode_cmd_and_payload(
-            self.CODE, encoded_payload=payload[0], appended_payload=payload[1:]
+            self.CODE, encoded_payload=payload[0], 
+            appended_payload=payload[1:],
+            additional_flags=self.additional_flags,
+            sequence_number=self.sequence_number,
         )
 
     def __str__(self) -> str:
