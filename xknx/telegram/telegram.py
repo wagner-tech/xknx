@@ -39,6 +39,7 @@ class TPDUType(Enum):
     T_DISCONNECT = 2
     T_ACK = 3
     T_ACK_NUMBERED = 4
+    T_NAK = 5
 
 
 class TelegramDirection(Enum):

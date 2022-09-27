@@ -5,6 +5,7 @@ from xknx import XKNX
 from xknx.prog.management import NM_EXISTS, NM_OK, NM_TIME_OUT, NetworkManagement
 from xknx.telegram.address import IndividualAddress
 
+import logging
 
 async def main():
     """Write inidividual address to device."""
@@ -13,7 +14,7 @@ async def main():
     await xknx.start()
     network_management = NetworkManagement(xknx)
     return_code = await network_management.individualaddress_write(
-        IndividualAddress("1.2.1")
+        IndividualAddress("1.2.2")
     )
     if return_code == NM_OK:
         print("Individual address write succeeded.")
@@ -26,5 +27,9 @@ async def main():
     await asyncio.sleep(5)
     await xknx.stop()
 
+#logging.basicConfig(level=logging.INFO)
+#logging.getLogger("xknx.log").level = logging.DEBUG
+#logging.getLogger("xknx.knx").level = logging.DEBUG
+#logging.getLogger("xknx.raw_socket").level = logging.DEBUG
 
 asyncio.run(main())

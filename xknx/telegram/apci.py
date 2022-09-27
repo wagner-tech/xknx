@@ -722,7 +722,6 @@ class DeviceDescriptorResponse(APCI):
 
     def from_knx(self, raw: bytes) -> None:
         """Parse/deserialize from KNX/IP raw data."""
-        print (len(raw), raw, raw[0], raw[1])
         self.descriptor, self.value = struct.unpack("!BH", raw[1:])
 
         self.descriptor = self.descriptor & 0x3F

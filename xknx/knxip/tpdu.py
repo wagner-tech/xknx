@@ -66,6 +66,8 @@ class TPDU:
             self.tpdu_type = TPDUType.T_DISCONNECT
         elif st == 0x2:
             self.tpdu_type = TPDUType.T_ACK
+        elif st == 0x3:
+            self.tpdu_type = TPDUType.T_NAK
         else:
             raise RuntimeError("Invalid TPDUType-code: " + str(st))
         self.data = raw

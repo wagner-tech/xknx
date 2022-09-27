@@ -51,6 +51,7 @@ class ProgDevice:
         self.group_address_type = group_address_type
         self.last_telegram = list()
         self.sequence_number = 0
+        self.connection_status = ConnectionState.NOT_CONNECTED
 
     async def process_telegram(self, telegram: Telegram) -> None:
         """Process a telegram."""
@@ -62,6 +63,25 @@ class ProgDevice:
                 await self.t_ack(True)
             if telegram.payload.CODE == APCIExtendedService.PROPERTY_VALUE_RESPONSE:
                 await self.t_ack(True)
+
+    async def connect(self) -> bool:
+        """Try to establish a connection to device."""
+        try:
+            await asyncio.wait_for(self.t_connect_response(), 0.5)
+            self.sequence_number = 1
+            self.connection_status = ConnectionState.A_CONNECTED
+            return True
+        except asyncio.TimeoutError:
+            pass
+
+        try:
+            await asyncio.wait_for(self.devicedescriptor_read_response(0), 0.5)
+            self.sequence_number = 1
+            self.connection_status = ConnectionState.A_CONNECTED
+            return True
+        except asyncio.TimeoutError:
+            pass
+        return False
 
     async def individualaddress_respone(self) -> IndividualAddress | None:
         """Process a IndividualAddress_Respone."""
@@ -176,6 +196,10 @@ class ProgDevice:
         )
         await self.xknx.telegrams.put(telegram)
 
+    async def finish(self):
+        if self.connection_status == ConnectionState.A_CONNECTED:
+            await self.t_disconnect()
+           
     async def memory_read(self, address: int = 0, count: int = 0, is_numbered = False) -> None:
         """Perform a PropertyValue_Read."""
         if is_numbered:
@@ -231,3 +255,14 @@ class ProgDevice:
             priority=Priority.SYSTEM,
         )
         await self.xknx.telegrams.put(telegram)
+
+# static fabric method
+async def create_and_connect(
+    xknx: XKNX,
+    ind_add: IndividualAddress,
+    group_address_type: GroupAddressType = GroupAddressType.LONG,
+    ):
+    dev = ProgDevice(xknx, ind_add, group_address_type)
+    if not await dev.connect():
+        raise RuntimeError(f"Could not connect to device {ind_add}")
+    return dev
