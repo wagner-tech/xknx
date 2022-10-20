@@ -514,7 +514,7 @@ class MemoryRead(APCI):
         self.address = address
         self.count = count
         self.additional_flags = None
-        self.sequence_number = sequence_number
+        self.sequence_number = sequence_number or 0
         if self.sequence_number:
             self.additional_flags = APCIAdditionalFlags.NUMBERED_DATA_PACKET
 
@@ -571,7 +571,7 @@ class MemoryWrite(APCI):
         self.count = count
         self.data = data
         self.additional_flags = None
-        self.sequence_number = sequence_number
+        self.sequence_number = sequence_number or 0
         if self.sequence_number:
             self.additional_flags = APCIAdditionalFlags.NUMBERED_DATA_PACKET
 
@@ -623,12 +623,9 @@ class MemoryResponse(APCI):
     ) -> None:
         """Initialize a new instance of MemoryResponse."""
 
-        if data is None:
-            data = bytearray()
-
         self.address = address
         self.count = count
-        self.data = data
+        self.data = data or bytearray()
 
     def calculated_length(self) -> int:
         """Get length of APCI payload."""

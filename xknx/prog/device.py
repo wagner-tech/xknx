@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import asyncio
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Tuple
 
 from xknx.telegram import (
     IndividualAddress,
@@ -20,6 +20,7 @@ from xknx.telegram.apci import (
     IndividualAddressRead,
     IndividualAddressWrite,
     MemoryRead,
+    MemoryResponse,
     MemoryWrite,
     PropertyValueRead,
     Restart,
@@ -49,7 +50,7 @@ class ProgDevice:
         self.xknx = xknx
         self.ind_add = ind_add
         self.group_address_type = group_address_type
-        self.last_telegram = list()
+        self.last_telegram: Telegram|None = None
         self.sequence_number = 0
         self.connection_status = ConnectionState.NOT_CONNECTED
 
@@ -134,7 +135,7 @@ class ProgDevice:
         telegram = Telegram(
             self.ind_add,
             TelegramDirection.OUTGOING,
-            DeviceDescriptorRead(descriptor, sequence_number = self.sequence_number),
+            DeviceDescriptorRead(descriptor, sequence_number=self.sequence_number),
             priority=Priority.SYSTEM,
         )
         self.sequence_number += 1
@@ -199,11 +200,13 @@ class ProgDevice:
     async def finish(self):
         if self.connection_status == ConnectionState.A_CONNECTED:
             await self.t_disconnect()
-           
-    async def memory_read(self, address: int = 0, count: int = 0, is_numbered = False) -> None:
+
+    async def memory_read(
+        self, address: int = 0, count: int = 0, is_numbered=False
+    ) -> None:
         """Perform a PropertyValue_Read."""
         if is_numbered:
-            mr = MemoryRead(address, count, sequence_number = self.sequence_number)
+            mr = MemoryRead(address, count, sequence_number=self.sequence_number)
             self.sequence_number += 1
         else:
             mr = MemoryRead(address, count)
@@ -215,26 +218,27 @@ class ProgDevice:
         )
         await self.xknx.telegrams.put(telegram)
 
-    async def memory_read_response(self, address: int = 0, count: int = 0) -> None:
+    async def memory_read_response(self, address: int = 0, count: int = 0) -> Tuple[int,int,bytes]:
         """Process a DeviceDescriptor_Read_Response."""
         await self.memory_read(address, count, True)
         while True:
             await asyncio.sleep(0.1)
             if self.last_telegram:
                 if self.last_telegram.payload:
-                    if (
-                        self.last_telegram.payload.CODE
-                        == APCIService.MEMORY_RESPONSE
-                    ):
-                        return ( self.last_telegram.payload.address, 
-                                 self.last_telegram.payload.count,
-                                 self.last_telegram.payload.data
+                    if self.last_telegram.payload.CODE == APCIService.MEMORY_RESPONSE:
+                        assert isinstance(self.last_telegram.payload, MemoryResponse)
+                        return (
+                            self.last_telegram.payload.address,
+                            self.last_telegram.payload.count,
+                            self.last_telegram.payload.data,
                         )
 
-    async def memory_write(self, address: int = 0, count: int = 0, data: bytes = None, is_numbered = False) -> None:
+    async def memory_write(
+        self, address: int = 0, count: int = 0, data: bytes = None, is_numbered=False
+    ) -> None:
         """Perform a PropertyValue_Write"""
         if is_numbered:
-            mw = MemoryWrite(address, count, data, sequence_number = self.sequence_number)
+            mw = MemoryWrite(address, count, data, sequence_number=self.sequence_number)
             self.sequence_number += 1
         else:
             mw = MemoryWrite(address, count, data)
@@ -256,12 +260,13 @@ class ProgDevice:
         )
         await self.xknx.telegrams.put(telegram)
 
+
 # static fabric method
 async def create_and_connect(
     xknx: XKNX,
     ind_add: IndividualAddress,
     group_address_type: GroupAddressType = GroupAddressType.LONG,
-    ):
+):
     dev = ProgDevice(xknx, ind_add, group_address_type)
     if not await dev.connect():
         raise RuntimeError(f"Could not connect to device {ind_add}")
