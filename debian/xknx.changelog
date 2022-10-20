@@ -1,0 +1,5 @@
+xknx (0.1-%BUILD%) unstable; urgency=medium
+  * write individual address
+  * switch LED
+ -- Michael Wagner <michael@wagnertech.de>  Wed,  20 Oct 2022 16:54:48 +0100
+

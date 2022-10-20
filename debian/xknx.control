@@ -1,0 +1,12 @@
+Source: xknx
+Section: main
+Priority: optional
+Maintainer: WagnerTech UG <mail@wagnertech.de>
+
+Package: xknx
+Section: base
+Priority: optional
+Architecture: all
+Depends: python3
+Description: knx stack
+
