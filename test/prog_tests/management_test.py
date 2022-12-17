@@ -15,27 +15,36 @@ class TestProgrammingInterface:
     """Test class for programming interface test."""
 
     called = 0
+    
+    async def fake_progdevice_connect(self, *p):
+        if self.called == 0:
+            self.called = 1
+            return False
+        else:
+            return True
 
-    async def fake_devicedescriptor_read_response(self, *p):
-        """Fake function for evicedescriptor_read_response."""
-        if self.called == 1:
-            return
-        self.called += 1
-        await self.time_travel(60.0)
-
+#    async def fake_devicedescriptor_read_response(self, *p):
+#        """Fake function for evicedescriptor_read_response."""
+#        if self.called == 1:
+#            return
+#        self.called += 1
+#        await self.time_travel(60.0)
+    
+    @patch("xknx.prog.device.ProgDevice.connect", autospec=True)
     @patch("xknx.prog.device.ProgDevice.individualaddress_read_response", autospec=True)
-    @patch("xknx.prog.device.ProgDevice.devicedescriptor_read_response", autospec=True)
+    @patch("xknx.prog.device.ProgDevice.propertyvalue_read", autospec=True)
     async def test_write_individual_address_success(
         self,
-        mock_devicedescriptor_read_response,
+        mock_propertyvalue_read,
         mock_individualaddress_read_response,
-        time_travel,
+        mock_progdevice_connect,
+        #time_travel,
     ):
         """Test IndividualAddress_Write with success."""
         xknx = XKNX()
-        self.time_travel = time_travel
-        mock_devicedescriptor_read_response.side_effect = (
-            self.fake_devicedescriptor_read_response
+        #self.time_travel = time_travel
+        mock_progdevice_connect.side_effect = (
+            self.fake_progdevice_connect
         )
         network_management = NetworkManagement(xknx)
         return_code = await network_management.individualaddress_write(

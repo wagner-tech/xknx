@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 
 from xknx.prog.device import ProgDevice, create_and_connect
 from xknx.telegram.address import GroupAddress, IndividualAddress
-from xknx.devices import device
 
 if TYPE_CHECKING:
     from xknx.telegram import Telegram
@@ -64,7 +63,7 @@ class NetworkManagement:
         await self.managed_dev.individualaddress_write()
 
         # Addition from ETS reverse engeneering
-        await self.set_managed_dev(create_and_connect(self.xknx, ind_add))
+        await self.set_managed_dev(await create_and_connect(self.xknx, ind_add))
         await self.managed_dev.propertyvalue_read()
         await self.managed_dev.restart()
         await asyncio.sleep(1)
