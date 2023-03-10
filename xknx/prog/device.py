@@ -62,8 +62,10 @@ class ProgDevice:
                 await self.t_ack()
             if telegram.payload.CODE == APCIService.MEMORY_RESPONSE:
                 await self.t_ack(True)
+                #self.sequence_number += 1
             if telegram.payload.CODE == APCIExtendedService.PROPERTY_VALUE_RESPONSE:
                 await self.t_ack(True)
+                #self.sequence_number += 1
 
     async def connect(self) -> bool:
         """Try to establish a connection to device."""
@@ -204,7 +206,7 @@ class ProgDevice:
     async def memory_read(
         self, address: int = 0, count: int = 0, is_numbered=False
     ) -> None:
-        """Perform a PropertyValue_Read."""
+        """Perform a Memory_Read."""
         if is_numbered:
             mr = MemoryRead(address, count, sequence_number=self.sequence_number)
             self.sequence_number += 1
@@ -234,14 +236,11 @@ class ProgDevice:
                         )
 
     async def memory_write(
-        self, address: int = 0, count: int = 0, data: bytes = None, is_numbered=False
+        self, address: int = 0, count: int = 0, data: bytes = None
     ) -> None:
         """Perform a PropertyValue_Write"""
-        if is_numbered:
-            mw = MemoryWrite(address, count, data, sequence_number=self.sequence_number)
-            self.sequence_number += 1
-        else:
-            mw = MemoryWrite(address, count, data)
+        mw = MemoryWrite(address, count, data, sequence_number=self.sequence_number)
+        self.sequence_number += 3
         telegram = Telegram(
             self.ind_add,
             TelegramDirection.OUTGOING,

@@ -4,7 +4,7 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 
-from xknx.prog.device import ProgDevice, create_and_connect
+from xknx.prog.device import ProgDevice, create_and_connect, ConnectionState
 from xknx.telegram.address import GroupAddress, IndividualAddress
 
 if TYPE_CHECKING:
@@ -41,6 +41,15 @@ class NetworkManagement:
         """Do something with the received telegram."""
         if self.managed_dev:
             await self.managed_dev.process_telegram(telegram)
+    
+    async def connect_managed_device(self, ind_add: IndividualAddress) -> int:
+        await self.set_managed_dev(ProgDevice(self.xknx, ind_add))
+        if await self.managed_dev.connect():
+            return NM_OK
+        return NM_NOT_EXISTS
+
+    async def disconnect_managed_device(self):
+        await self.managed_dev.finish()
 
     async def individualaddress_write(self, ind_add: IndividualAddress) -> int:
         """Perform IndividualAdress_Write."""
@@ -71,33 +80,46 @@ class NetworkManagement:
 
         return NM_OK
 
-    async def switch_led(self, ind_add, value):
+    async def switch_led(self, value: int) -> int:
         # define device
-        await self.set_managed_dev(ProgDevice(self.xknx, ind_add))
-
-        # check if device present
-        if not await self.managed_dev.connect():
-            return NM_NOT_EXISTS
 
         if value == 0:
-            resp = await self.managed_dev.memory_read_response(96, 1)
-            if resp[2] == b"\x81":
+            resp = await self.read_memory(96, 1)
+            if resp == b"\x81":
                 # LED on
-                await self.managed_dev.memory_write(96, 1, b"\x00", True)
+                await self.write_memory(96, 1, b"\x00")
                 print("LED ausgeschaltet.")
             else:
                 print("LED brennt nicht.")
         elif value == 1:
-            resp = await self.managed_dev.memory_read_response(96, 1)
-            if resp[2] == b"\x00":
+            resp = await self.read_memory(96, 1)
+            if resp == b"\x00":
                 # LED off
-                await self.managed_dev.memory_write(96, 1, b"\x81", True)
+                await self.write_memory(96, 1, b"\x81")
                 print("LED eingeschaltet.")
             else:
                 print("LED brennt schon.")
         else:
             raise RuntimeError("value parameter must be 0 or 1.")
 
-        # await self.managed_dev.finish()
-
         return NM_OK
+
+    async def write_memory(self, offset:int, count:int, data:bytes) -> int:
+        # check device state
+        if self.managed_dev.connection_status == ConnectionState.NOT_CONNECTED:
+            raise RuntimeError("Device not connected.")
+
+        await self.managed_dev.memory_write(offset, count, data)
+        return NM_OK
+
+    async def read_memory(self, offset:int, count:int) -> bytes:
+        # check device state
+        if self.managed_dev.connection_status == ConnectionState.NOT_CONNECTED:
+            raise RuntimeError("Device not connected.")
+
+        (roffset,rcount,data) = await self.managed_dev.memory_read_response(offset, count)
+        if roffset != offset:
+            raise RuntimeError("Cound not read from address: "+str(offset))
+        if rcount != count:
+            raise RuntimeError("Cound not read number of bytes: "+str(count))
+        return data

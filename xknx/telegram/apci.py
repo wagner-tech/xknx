@@ -133,6 +133,9 @@ class APCI(ABC):
     def to_knx(self) -> bytes:
         """Serialize to KNX/IP raw data - to be implemented in derived class."""
 
+    def eval_tpci(self, tpci_apci) -> None:
+        self.sequence_number = ((tpci_apci >> 10) & 3)
+        
     def __eq__(self, other: object) -> bool:
         """Equal operator."""
         return self.__dict__ == other.__dict__
@@ -369,7 +372,7 @@ class IndividualAddressWrite(APCI):
 
     def __str__(self) -> str:
         """Return object as readable string."""
-        return f'<IndividualAddressWrite address="{self.address}" />'
+        return f'<IndividualAddressWrite SN={self.sequence_number} address="{self.address}" />'
 
 
 class IndividualAddressRead(APCI):
@@ -393,7 +396,7 @@ class IndividualAddressRead(APCI):
 
     def __str__(self) -> str:
         """Return object as readable string."""
-        return "<IndividualAddressRead />"
+        return f"<IndividualAddressRead SN={self.sequence_number} />"
 
 
 class IndividualAddressResponse(APCI):
@@ -422,7 +425,7 @@ class IndividualAddressResponse(APCI):
 
     def __str__(self) -> str:
         """Return object as readable string."""
-        return "<IndividualAddressResponse />"
+        return f"<IndividualAddressResponse SN={self.sequence_number} />"
 
 
 class ADCRead(APCI):
@@ -547,7 +550,7 @@ class MemoryRead(APCI):
 
     def __str__(self) -> str:
         """Return object as readable string."""
-        return f'<MemoryRead address="{hex(self.address)}" count="{self.count}" />'
+        return f'<MemoryRead SN={self.sequence_number} address="{hex(self.address)}" count="{self.count}" />'
 
 
 class MemoryWrite(APCI):
@@ -606,7 +609,7 @@ class MemoryWrite(APCI):
 
     def __str__(self) -> str:
         """Return object as readable string."""
-        return f'<MemoryWrite address="{hex(self.address)}" count="{self.count}" data="{self.data.hex()}" />'
+        return f'<MemoryWrite SN={self.sequence_number} address="{hex(self.address)}" count="{self.count}" data="{self.data.hex()}" />'
 
 
 class MemoryResponse(APCI):
@@ -655,7 +658,7 @@ class MemoryResponse(APCI):
 
     def __str__(self) -> str:
         """Return object as readable string."""
-        return f'<MemoryResponse address="{hex(self.address)}" count="{self.count}" data="{self.data.hex()}" />'
+        return f'<MemoryResponse SN={self.sequence_number} address="{hex(self.address)}" count="{self.count}" data="{self.data.hex()}" />'
 
 
 class DeviceDescriptorRead(APCI):
@@ -696,7 +699,7 @@ class DeviceDescriptorRead(APCI):
 
     def __str__(self) -> str:
         """Return object as readable string."""
-        return f'<DeviceDescriptorRead descriptor="{self.descriptor}" />'
+        return f'<DeviceDescriptorRead SN={self.sequence_number} descriptor="{self.descriptor}" />'
 
 
 class DeviceDescriptorResponse(APCI):
@@ -736,7 +739,7 @@ class DeviceDescriptorResponse(APCI):
 
     def __str__(self) -> str:
         """Return object as readable string."""
-        return f'<DeviceDescriptorResponse descriptor="{self.descriptor}" value="{self.value}" />'
+        return f'<DeviceDescriptorResponse SN={self.sequence_number} descriptor="{self.descriptor}" value="{self.value}" />'
 
 
 class Restart(APCI):
@@ -776,7 +779,7 @@ class Restart(APCI):
 
     def __str__(self) -> str:
         """Return object as readable string."""
-        return "<Restart />"
+        return f"<Restart SN={self.sequence_number} />"
 
 
 class UserMemoryRead(APCI):
@@ -1249,6 +1252,7 @@ class PropertyValueRead(APCI):
         """Return object as readable string."""
         return (
             "<PropertyValueRead "
+            f'SN={self.sequence_number} ' 
             f'object_index="{self.object_index}" '
             f'property_id="{self.property_id}" '
             f'count="{self.count}" '

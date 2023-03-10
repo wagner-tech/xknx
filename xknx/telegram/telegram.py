@@ -38,8 +38,7 @@ class TPDUType(Enum):
     T_CONNECT = 1
     T_DISCONNECT = 2
     T_ACK = 3
-    T_ACK_NUMBERED = 4
-    T_NAK = 5
+    T_NAK = 4
 
 
 class TelegramDirection(Enum):
@@ -62,6 +61,7 @@ class Telegram:
         source_address: IndividualAddress | None = IndividualAddress(0),
         tpdu_type: TPDUType = TPDUType.T_DATA,
         priority: Priority = Priority.LOW,
+        sequence_number = 0
     ) -> None:
         """Initialize Telegram class."""
         self.destination_address = destination_address
@@ -71,6 +71,7 @@ class Telegram:
         self.tpdu_type = tpdu_type
         self.priority = priority
         self.timestamp = datetime.now()
+        self.sequence_number = sequence_number
 
     def __str__(self) -> str:
         """Return object as readable string."""

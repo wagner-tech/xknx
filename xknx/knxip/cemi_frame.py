@@ -177,6 +177,7 @@ class CEMIFrame:
                 f"APCI not supported: {(tpci_apci & 0x03FF):#012b}"
             )
 
+        self.payload.eval_tpci(tpci_apci)
         self.payload.from_knx(apdu)
 
         return 10 + addil + self.mpdu_len
