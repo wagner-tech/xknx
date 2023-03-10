@@ -3,25 +3,16 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from xknx.knxip import (
-    CEMIFrame,
-    CEMIMessageCode,
-    KNXIPFrame,
-    TunnellingAck,
-    TunnellingRequest,
-)
-from xknx.knxip.tpdu import TPDU
-from xknx.telegram.telegram import TPDUType
+from xknx.knxip import KNXIPFrame, TunnellingAck, TunnellingRequest
 
 from .request_response import RequestResponse
 
 if TYPE_CHECKING:
     from xknx.io.transport import UDPTransport
-    from xknx.telegram import IndividualAddress, Telegram
 
 
 class Tunnelling(RequestResponse):
-    """Class to TunnelingRequest and wait for TunnelingACK (UDP only)."""
+    """Class to send TunnelingRequest and wait for TunnelingACK (UDP only)."""
 
     transport: UDPTransport
 
@@ -29,43 +20,17 @@ class Tunnelling(RequestResponse):
         self,
         transport: UDPTransport,
         data_endpoint: tuple[str, int] | None,
-        telegram: Telegram,
-        src_address: IndividualAddress,
-        sequence_counter: int,
-        communication_channel_id: int,
+        tunnelling_request: TunnellingRequest,
     ):
         """Initialize Tunnelling class."""
         self.data_endpoint_addr = data_endpoint
-        self.src_address = src_address
-
+        self.tunnelling_request = tunnelling_request
         super().__init__(transport, TunnellingAck)
-
-        self.telegram = telegram
-        self.sequence_counter = sequence_counter
-        self.communication_channel_id = communication_channel_id
 
     async def send_request(self) -> None:
         """Build knxipframe (within derived class) and send via UDP."""
         self.transport.send(self.create_knxipframe(), addr=self.data_endpoint_addr)
 
     def create_knxipframe(self) -> KNXIPFrame:
-        """Create KNX/IP Frame object to be sent on bus."""
-        if self.telegram.tpdu_type == TPDUType.T_DATA:
-            pdu: CEMIFrame | TPDU = CEMIFrame.init_from_telegram(
-                telegram=self.telegram,
-                code=CEMIMessageCode.L_DATA_REQ,
-                src_addr=self.src_address,
-            )
-        else:
-            # all other tpdu_types are non CEMI types
-            pdu = TPDU.init_from_telegram(
-                telegram=self.telegram,
-                src_addr=self.src_address,
-            )
-
-        tunnelling_request = TunnellingRequest(
-            communication_channel_id=self.communication_channel_id,
-            sequence_counter=self.sequence_counter,
-            pdu=pdu,
-        )
-        return KNXIPFrame.init_from_body(tunnelling_request)
+        """Create KNX/IP Frame object to be sent to device."""
+        return KNXIPFrame.init_from_body(self.tunnelling_request)

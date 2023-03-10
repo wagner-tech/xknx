@@ -1,8 +1,9 @@
 """Module for managing a KNX scene."""
 from __future__ import annotations
 
+from collections.abc import Iterator
 import logging
-from typing import TYPE_CHECKING, Iterator
+from typing import TYPE_CHECKING
 
 from xknx.remote_value import GroupAddressesType, RemoteValueSceneNumber
 
@@ -23,7 +24,7 @@ class Scene(Device):
         name: str,
         group_address: GroupAddressesType | None = None,
         scene_number: int = 1,
-        device_updated_cb: DeviceCallbackType | None = None,
+        device_updated_cb: DeviceCallbackType[Scene] | None = None,
     ):
         """Initialize Sceneclass."""
         super().__init__(xknx, name, device_updated_cb)

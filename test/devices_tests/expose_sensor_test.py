@@ -1,5 +1,5 @@
 """Unit test for Sensor objects."""
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, call
 
 from xknx import XKNX
 from xknx.devices import ExposeSensor
@@ -119,13 +119,7 @@ class TestExposeSensor:
         expose_sensor = ExposeSensor(
             xknx, "TestSensor", value_type="binary", group_address="1/2/3"
         )
-
-        await expose_sensor.process(
-            Telegram(
-                destination_address=GroupAddress("1/2/3"),
-                payload=GroupValueWrite(DPTBinary(True)),
-            )
-        )
+        expose_sensor.sensor_value.value = True
 
         telegram = Telegram(GroupAddress("1/2/3"), payload=GroupValueRead())
         await expose_sensor.process(telegram)
@@ -165,13 +159,7 @@ class TestExposeSensor:
         expose_sensor = ExposeSensor(
             xknx, "TestSensor", value_type="temperature", group_address="1/2/3"
         )
-
-        await expose_sensor.process(
-            Telegram(
-                destination_address=GroupAddress("1/2/3"),
-                payload=GroupValueWrite(DPTArray((0x0C, 0x1A))),
-            )
-        )
+        expose_sensor.sensor_value.value = 21.0
 
         telegram = Telegram(GroupAddress("1/2/3"), payload=GroupValueRead())
         await expose_sensor.process(telegram)
@@ -181,6 +169,22 @@ class TestExposeSensor:
             destination_address=GroupAddress("1/2/3"),
             payload=GroupValueResponse(DPTArray((0x0C, 0x1A))),
         )
+
+    async def test_process_no_respond_to_read(self):
+        """Test expose sensor with respond_to_read set to False."""
+        xknx = XKNX()
+        expose_sensor = ExposeSensor(
+            xknx,
+            "TestSensor",
+            value_type="temperature",
+            group_address="1/2/3",
+            respond_to_read=False,
+        )
+        expose_sensor.sensor_value.value = 21.0
+
+        telegram = Telegram(GroupAddress("1/2/3"), payload=GroupValueRead())
+        await expose_sensor.process(telegram)
+        assert xknx.telegrams.qsize() == 0
 
     #
     # HAS GROUP ADDRESS
@@ -210,3 +214,159 @@ class TestExposeSensor:
         await expose_sensor.set(21.0)
         await xknx.devices.process(xknx.telegrams.get_nowait())
         after_update_callback.assert_called_with(expose_sensor)
+
+    #
+    # TEST COOLDOWN
+    #
+    async def test_cooldown(self, time_travel):
+        """Test cooldown."""
+        xknx = XKNX()
+        xknx.cemi_handler = AsyncMock()
+        await xknx.telegram_queue.start()
+
+        expose_sensor_cd = ExposeSensor(
+            xknx,
+            "TestSensor",
+            group_address="1/2/3",
+            value_type="temperature",
+            cooldown=10,
+        )
+        expose_sensor_no_cd = ExposeSensor(
+            xknx,
+            "TestSensor",
+            group_address="1/2/4",
+            value_type="temperature",
+        )
+
+        await expose_sensor_cd.set(21.0)
+        await expose_sensor_no_cd.set(21.0)
+        await time_travel(0)
+        xknx.cemi_handler.send_telegram.assert_has_calls(
+            [
+                call(
+                    Telegram(
+                        destination_address=GroupAddress("1/2/3"),
+                        payload=GroupValueWrite(DPTArray((0x0C, 0x1A))),
+                    )
+                ),
+                call(
+                    Telegram(
+                        destination_address=GroupAddress("1/2/4"),
+                        payload=GroupValueWrite(DPTArray((0x0C, 0x1A))),
+                    )
+                ),
+            ]
+        )
+        xknx.cemi_handler.send_telegram.reset_mock()
+
+        # don't send telegram with same payload twice if cooldown is active
+        await expose_sensor_cd.set(21.0)
+        await expose_sensor_no_cd.set(21.0)
+        await time_travel(0)
+        xknx.cemi_handler.send_telegram.assert_has_calls(
+            [
+                call(
+                    Telegram(
+                        destination_address=GroupAddress("1/2/4"),
+                        payload=GroupValueWrite(DPTArray((0x0C, 0x1A))),
+                    )
+                ),
+            ]
+        )
+        xknx.cemi_handler.send_telegram.reset_mock()
+
+        await time_travel(10)
+        assert xknx.telegrams.qsize() == 0
+        xknx.cemi_handler.send_telegram.assert_not_called()
+
+        # different payload after cooldown
+        await expose_sensor_cd.set(10.0)
+        await expose_sensor_no_cd.set(10.0)
+        await time_travel(0)
+        xknx.cemi_handler.send_telegram.assert_has_calls(
+            [
+                call(
+                    Telegram(
+                        destination_address=GroupAddress("1/2/3"),
+                        payload=GroupValueWrite(DPTArray((0x03, 0xE8))),
+                    )
+                ),
+                call(
+                    Telegram(
+                        destination_address=GroupAddress("1/2/4"),
+                        payload=GroupValueWrite(DPTArray((0x03, 0xE8))),
+                    )
+                ),
+            ]
+        )
+        xknx.cemi_handler.send_telegram.reset_mock()
+        # different payload immediately (payload of 3.111 equals 3.11)
+        await expose_sensor_cd.set(3.111)
+        await expose_sensor_no_cd.set(3.111)
+        await time_travel(0)
+        xknx.cemi_handler.send_telegram.assert_has_calls(
+            [
+                call(
+                    Telegram(
+                        destination_address=GroupAddress("1/2/4"),
+                        payload=GroupValueWrite(DPTArray((0x01, 0x37))),
+                    )
+                ),
+            ]
+        )
+        xknx.cemi_handler.send_telegram.reset_mock()
+        assert expose_sensor_cd._cooldown_latest_value == 3.111
+        assert expose_sensor_cd.sensor_value.value == 10
+        await time_travel(10)
+        xknx.cemi_handler.send_telegram.assert_has_calls(
+            [
+                call(
+                    Telegram(
+                        destination_address=GroupAddress("1/2/3"),
+                        payload=GroupValueWrite(DPTArray((0x01, 0x37))),
+                    )
+                ),
+            ]
+        )
+        xknx.cemi_handler.send_telegram.reset_mock()
+        assert expose_sensor_cd._cooldown_latest_value == 3.11
+        assert expose_sensor_cd.sensor_value.value == 3.11
+        await time_travel(10)
+        xknx.cemi_handler.send_telegram.assert_not_called()
+
+        # reading unsent value
+        await expose_sensor_cd.set(10)
+        #   first send new value
+        await time_travel(0)
+        xknx.cemi_handler.send_telegram.assert_has_calls(
+            [
+                call(
+                    Telegram(
+                        destination_address=GroupAddress("1/2/3"),
+                        payload=GroupValueWrite(DPTArray((0x03, 0xE8))),
+                    )
+                ),
+            ]
+        )
+        xknx.cemi_handler.send_telegram.reset_mock()
+        #   in cooldown with a new value - receiving a read request
+        await expose_sensor_cd.set(21)
+        await expose_sensor_cd.process(
+            Telegram(GroupAddress("1/2/3"), payload=GroupValueRead())
+        )
+        await time_travel(0)
+        xknx.cemi_handler.send_telegram.assert_has_calls(
+            [
+                call(
+                    Telegram(
+                        destination_address=GroupAddress("1/2/3"),
+                        payload=GroupValueResponse(DPTArray((0x0C, 0x1A))),
+                    )
+                ),
+            ]
+        )
+        xknx.cemi_handler.send_telegram.reset_mock()
+        #   after cooldown - new value not sent again (already in GroupValueResponse)
+        await time_travel(10)
+        xknx.cemi_handler.send_telegram.assert_not_called()
+        await xknx.stop()

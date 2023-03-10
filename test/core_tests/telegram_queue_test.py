@@ -49,16 +49,19 @@ class TestTelegramQueue:
     @patch("asyncio.sleep", new_callable=AsyncMock)
     async def test_rate_limit(self, async_sleep_mock):
         """Test rate limit."""
-        xknx = XKNX()
-        xknx.rate_limit = 20  # 50 ms per outgoing telegram
+        xknx = XKNX(
+            rate_limit=20,  # 50 ms per outgoing telegram
+        )
         sleep_time = 0.05  # 1 / 20
 
         telegram_in = Telegram(
+            destination_address=GroupAddress("1/2/3"),
             direction=TelegramDirection.INCOMING,
             payload=GroupValueWrite(DPTBinary(1)),
         )
 
         telegram_out = Telegram(
+            destination_address=GroupAddress("1/2/3"),
             direction=TelegramDirection.OUTGOING,
             payload=GroupValueWrite(DPTBinary(1)),
         )
@@ -113,7 +116,7 @@ class TestTelegramQueue:
         """Test telegram_received_callback with outgoing telegrams."""
 
         xknx = XKNX()
-        xknx.knxip_interface = AsyncMock()
+        xknx.cemi_handler = AsyncMock()
         async_telegram_received_cb = AsyncMock()
         xknx.telegram_queue.register_telegram_received_cb(
             async_telegram_received_cb, None, None, True
@@ -132,7 +135,7 @@ class TestTelegramQueue:
         """Test telegram_received_callback with outgoing telegrams."""
 
         xknx = XKNX()
-        xknx.knxip_interface = AsyncMock()
+        xknx.cemi_handler = AsyncMock()
         async_telegram_received_cb = AsyncMock()
         xknx.telegram_queue.register_telegram_received_cb(async_telegram_received_cb)
 
@@ -207,8 +210,7 @@ class TestTelegramQueue:
         async_telegram_received_callback.assert_called_once_with(telegram)
         devices_process.assert_called_once_with(telegram)
 
-    @patch("xknx.io.KNXIPInterface", new_callable=AsyncMock)
-    async def test_outgoing(self, if_mock):
+    async def test_outgoing(self):
         """Test outgoing telegrams in telegram queue."""
         xknx = XKNX()
 
@@ -218,16 +220,14 @@ class TestTelegramQueue:
             payload=GroupValueWrite(DPTBinary(1)),
         )
 
-        # log a warning if there is no KNXIP interface instanciated
+        # log a warning if there is no KNXIP interface instantiated
         with pytest.raises(CommunicationError):
             await xknx.telegram_queue.process_telegram_outgoing(telegram)
 
-        if_mock.send_telegram.assert_not_called()
-
-        # if we have an interface send the telegram
-        xknx.knxip_interface = if_mock
+        # if we have an interface send the telegram (doesn't raise)
+        xknx.cemi_handler.send_telegram = AsyncMock()
         await xknx.telegram_queue.process_telegram_outgoing(telegram)
-        if_mock.send_telegram.assert_called_once_with(telegram)
+        xknx.cemi_handler.send_telegram.assert_called_once_with(telegram)
 
     @patch("logging.Logger.error")
     @patch("xknx.core.TelegramQueue.process_telegram_incoming", new_callable=MagicMock)

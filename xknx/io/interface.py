@@ -5,9 +5,14 @@ Abstract base for a specific KNX/IP connection (Tunneling or Routing).
 * It starts and stops a udp transport
 * It packs Telegrams into KNX Frames and passes them to a udp transport
 """
-from abc import ABC, abstractmethod
+from __future__ import annotations
 
-from xknx.telegram import Telegram
+from abc import ABC, abstractmethod
+from typing import Callable
+
+from xknx.cemi import CEMIFrame
+
+CEMICallbackType = Callable[[bytes], None]
 
 
 class Interface(ABC):
@@ -22,5 +27,5 @@ class Interface(ABC):
         """Disconnect from KNX bus."""
 
     @abstractmethod
-    async def send_telegram(self, telegram: Telegram) -> None:
-        """Send Telegram to KNX bus."""
+    async def send_cemi(self, cemi: CEMIFrame) -> None:
+        """Send CEMIFrame to KNX bus."""

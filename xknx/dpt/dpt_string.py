@@ -17,7 +17,7 @@ class DPTString(DPTBase):
     dpt_main_number = 16
     dpt_sub_number = 0
     value_type = "string"
-    unit = ""
+    unit = None
 
     _encoding = "ascii"
 
@@ -56,6 +56,7 @@ class DPTLatin1(DPTString):
     DPT 16.001
     """
 
+    dpt_main_number = 16
     dpt_sub_number = 1
     value_type = "latin_1"
     _encoding = "latin_1"

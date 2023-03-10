@@ -5,7 +5,8 @@ More or less an array with devices. Adds some search functionality to find devic
 """
 from __future__ import annotations
 
-from typing import Awaitable, Callable, Iterator
+from collections.abc import Awaitable, Iterator
+from typing import Callable
 
 from xknx.telegram import Telegram
 from xknx.telegram.address import DeviceGroupAddress, GroupAddress, InternalGroupAddress
@@ -24,13 +25,13 @@ class Devices:
         self.device_updated_cbs: list[DeviceCallbackType] = []
 
     def register_device_updated_cb(self, device_updated_cb: DeviceCallbackType) -> None:
-        """Register callback for devices beeing updated."""
+        """Register callback for devices being updated."""
         self.device_updated_cbs.append(device_updated_cb)
 
     def unregister_device_updated_cb(
         self, device_updated_cb: DeviceCallbackType
     ) -> None:
-        """Unregister callback for devices beeing updated."""
+        """Unregister callback for devices being updated."""
         self.device_updated_cbs.remove(device_updated_cb)
 
     def __iter__(self) -> Iterator[Device]:
@@ -60,10 +61,7 @@ class Devices:
 
     def __contains__(self, key: str) -> bool:
         """Return if devices with name 'key' is within devices."""
-        for device in self.__devices:
-            if device.name == key:
-                return True
-        return False
+        return any(device.name == key for device in self.__devices)
 
     def add(self, device: Device) -> None:
         """Add device to devices vector."""

@@ -2,6 +2,7 @@
 from unittest.mock import patch
 
 from xknx import XKNX
+from xknx.cemi import CEMIFrame
 from xknx.devices import (
     BinarySensor,
     Climate,
@@ -29,12 +30,12 @@ from xknx.exceptions import (
 from xknx.io.gateway_scanner import GatewayDescriptor
 from xknx.knxip import (
     HPAI,
-    CEMIFrame,
     ConnectionStateRequest,
     ConnectionStateResponse,
     ConnectRequest,
     ConnectRequestType,
     ConnectResponse,
+    ConnectResponseData,
     DIBDeviceInformation,
     DIBGeneric,
     DIBServiceFamily,
@@ -513,7 +514,7 @@ class TestStringRepresentations:
         header.total_length = 42
         assert (
             str(header)
-            == '<KNXIPHeader HeaderLength="6" ProtocolVersion="16" KNXIPServiceType="ROUTING_INDICATION" Reserve="0" TotalLength="42" '
+            == '<KNXIPHeader HeaderLength="6" ProtocolVersion="16" KNXIPServiceType="ROUTING_INDICATION" TotalLength="42" '
             "/>"
         )
 
@@ -526,21 +527,23 @@ class TestStringRepresentations:
         assert (
             str(connect_request)
             == '<ConnectRequest control_endpoint="192.168.42.1:33941/udp" data_endpoint="192.168.42.2:33942/udp" '
-            'request_type="ConnectRequestType.TUNNEL_CONNECTION" flags="0x2" />'
+            'cri="<ConnectRequestInformation connection_type="TUNNEL_CONNECTION" knx_layer="DATA_LINK_LAYER" />" />'
         )
 
     def test_connect_response(self):
         """Test string representatoin of KNX/IP ConnectResponse."""
         connect_response = ConnectResponse()
         connect_response.communication_channel = 13
-        connect_response.request_type = ConnectRequestType.TUNNEL_CONNECTION
         connect_response.data_endpoint = HPAI(ip_addr="192.168.42.1", port=33941)
-        connect_response.identifier = 42
+        connect_response.crd = ConnectResponseData(
+            request_type=ConnectRequestType.TUNNEL_CONNECTION,
+            individual_address=IndividualAddress("1.2.3"),
+        )
         assert (
             str(connect_response)
             == '<ConnectResponse communication_channel="13" status_code="ErrorCode.E_NO_ERROR" '
             'data_endpoint="192.168.42.1:33941/udp" '
-            'request_type="ConnectRequestType.TUNNEL_CONNECTION" identifier="42" />'
+            'crd="<ConnectResponseData request_type="ConnectRequestType.TUNNEL_CONNECTION" individual_address="1.2.3" />" />'
         )
 
     def test_disconnect_request(self):
@@ -626,9 +629,7 @@ class TestStringRepresentations:
         tunnelling_request.sequence_counter = 42
         assert (
             str(tunnelling_request)
-            == '<TunnellingRequest communication_channel_id="23" sequence_counter="42" '
-            'pdu="<CEMIFrame SourceAddress="IndividualAddress("0.0.0")" DestinationAddress="GroupAddress("0/0/0")" '
-            'Flags="               0" code="L_DATA_REQ" payload="None" />" />'
+            == '<TunnellingRequest communication_channel_id="23" sequence_counter="42" cemi="" />'
         )
 
     def test_tunnelling_ack(self):
@@ -643,27 +644,27 @@ class TestStringRepresentations:
 
     def test_cemi_frame(self):
         """Test string representation of KNX/IP CEMI Frame."""
-        cemi_frame = CEMIFrame()
-        cemi_frame.src_addr = GroupAddress("1/2/3")
-        cemi_frame.telegram = Telegram(
-            destination_address=GroupAddress("1/2/5"),
-            payload=GroupValueWrite(DPTBinary(7)),
+        cemi_frame = CEMIFrame.init_from_telegram(
+            Telegram(
+                destination_address=GroupAddress("1/2/5"),
+                payload=GroupValueWrite(DPTBinary(7)),
+            ),
+            src_addr=IndividualAddress("1.2.3"),
         )
         assert (
             str(cemi_frame)
-            == '<CEMIFrame SourceAddress="GroupAddress("1/2/3")" DestinationAddress="GroupAddress("1/2/5")" '
-            'Flags="1011110011100000" code="L_DATA_IND" payload="<GroupValueWrite value="<DPTBinary value="7" />" />" />'
+            == '<CEMIFrame code="L_DATA_IND" src_addr="IndividualAddress("1.2.3")" dst_addr="GroupAddress("1/2/5")" '
+            'flags="1011110011100000" tpci="TDataGroup()" payload="<GroupValueWrite value="<DPTBinary value="7" />" />" />'
         )
 
     def test_knxip_frame(self):
         """Test string representation of KNX/IP Frame."""
-        knxipframe = KNXIPFrame()
-        knxipframe.init(KNXIPServiceType.SEARCH_REQUEST)
+        search_request = SearchRequest()
+        knxipframe = KNXIPFrame.init_from_body(search_request)
         assert (
             str(knxipframe)
             == '<KNXIPFrame <KNXIPHeader HeaderLength="6" ProtocolVersion="16" KNXIPServiceType="SEARCH_REQUEST" '
-            'Reserve="0" TotalLength="0" />\n'
-            ' body="<SearchRequest discovery_endpoint="0.0.0.0:0/udp" />" />'
+            'TotalLength="14" /> body="<SearchRequest discovery_endpoint="0.0.0.0:0/udp" />" />'
         )
 
     #
@@ -689,8 +690,4 @@ class TestStringRepresentations:
     def test_routing_indication_str(self):
         """Test string representation of GatewayDescriptor."""
         routing_indication = RoutingIndication()
-        assert (
-            str(routing_indication)
-            == '<RoutingIndication cemi="<CEMIFrame SourceAddress="IndividualAddress("0.0.0")" '
-            'DestinationAddress="GroupAddress("0/0/0")" Flags="               0" code="L_DATA_IND" payload="None" />" />'
-        )
+        assert str(routing_indication) == '<RoutingIndication cemi="" />'

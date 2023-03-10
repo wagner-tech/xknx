@@ -8,6 +8,7 @@ import pytest
 from xknx.dpt import (
     DPT2ByteFloat,
     DPT4ByteFloat,
+    DPTAirFlow,
     DPTElectricCurrent,
     DPTElectricPotential,
     DPTEnthalpy,
@@ -78,6 +79,13 @@ class TestDPTFloat:
         """Test parsing and streaming of DPT2ByteFloat with maximum value."""
         assert DPT2ByteFloat.to_knx(DPT2ByteFloat.value_max) == (0x7F, 0xFF)
         assert DPT2ByteFloat.from_knx((0x7F, 0xFF)) == DPT2ByteFloat.value_max
+
+    def test_close_to_limit(self):
+        """Test parsing and streaming of DPT2ByteFloat with numeric limit."""
+        assert DPT2ByteFloat.to_knx(20.48) == (0x0C, 0x00)
+        assert DPT2ByteFloat.from_knx((0x0C, 0x00)) == 20.48
+        assert DPT2ByteFloat.to_knx(-20.48) == (0x80, 0x00)
+        assert DPT2ByteFloat.from_knx((0x80, 0x00)) == -20.48
 
     def test_min(self):
         """Test parsing and streaming of DPT2ByteFloat with minimum value."""
@@ -184,6 +192,13 @@ class TestDPTFloat:
         assert DPTPartsPerMillion.unit == "ppm"
 
     #
+    # DPTAirFlow
+    #
+    def test_airflow_settings(self):
+        """Test attributes of DPTAirFlow."""
+        assert DPTAirFlow.unit == "m³/h"
+
+    #
     # DPTVoltage
     #
     def test_voltage_settings(self):
@@ -214,7 +229,7 @@ class TestDPTFloat:
         """Test DPT4ByteFloat object."""
         assert DPT4ByteFloat.from_knx((0x3F, 0x71, 0xEB, 0x86)) == 0.9450001
         assert DPT4ByteFloat.to_knx(0.945000052452) == (0x3F, 0x71, 0xEB, 0x86)
-        assert DPT4ByteFloat.unit == ""
+        assert DPT4ByteFloat.unit is None
 
     def test_4byte_float_values_from_voltage_meter(self):
         """Test parsing DPT4ByteFloat from voltage meter."""

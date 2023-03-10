@@ -1,17 +1,19 @@
 """
-Module for queing telegrams.
+Module for queueing telegrams addressed to group addresses.
 
-When a device wants to sends a telegram to the KNX bus, it has to queue it to the TelegramQueue within XKNX.
-
-The underlaying KNXIPInterface will poll the queue and send the packets to the correct KNX/IP abstraction (Tunneling or Routing).
-
+When a device wants to send a telegram to the KNX bus, it has to queue it to the
+TelegramQueue within XKNX. The telegram will be forwarded to the local CEMIHandler and
+processed in xknx-Devices.
 You may register callbacks to be notified if a telegram was pushed to the queue.
+
+Telegrams addressed to IndividualAddresses are not processed by this queue.
 """
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable
 import logging
-from typing import TYPE_CHECKING, Awaitable, Callable
+from typing import TYPE_CHECKING, Callable
 
 from xknx.exceptions import CommunicationError, XKNXException
 from xknx.telegram import AddressFilter, Telegram, TelegramDirection
@@ -94,7 +96,7 @@ class TelegramQueue:
     def unregister_telegram_received_cb(
         self, telegram_received_cb: TelegramQueue.Callback
     ) -> None:
-        """Unregister callback for a telegram beeing received from KNX bus."""
+        """Unregister callback for a telegram being received from KNX bus."""
         self.telegram_received_cbs.remove(telegram_received_cb)
 
     async def start(self) -> None:
@@ -199,9 +201,8 @@ class TelegramQueue:
         """Process outgoing telegram."""
         telegram_logger.debug(telegram)
         if not isinstance(telegram.destination_address, InternalGroupAddress):
-            if self.xknx.knxip_interface is None:
-                raise CommunicationError("No KNXIP interface defined")
-            await self.xknx.knxip_interface.send_telegram(telegram)
+            # raises CommunicationError when interface is not connected
+            await self.xknx.cemi_handler.send_telegram(telegram)
 
         await self.xknx.devices.process(telegram)
         await self._run_telegram_received_cbs(telegram)

@@ -6,8 +6,9 @@ Controller modes use DPT 20.105.
 """
 from __future__ import annotations
 
+from collections.abc import Iterator
 from itertools import chain
-from typing import TYPE_CHECKING, Any, Iterator
+from typing import TYPE_CHECKING, Any
 
 from xknx.dpt.dpt_hvac_mode import HVACControllerMode, HVACOperationMode
 from xknx.exceptions import DeviceIllegalValue
@@ -49,7 +50,7 @@ class ClimateMode(Device):
         sync_state: bool | int | float | str = True,
         operation_modes: list[str | HVACOperationMode] | None = None,
         controller_modes: list[str | HVACControllerMode] | None = None,
-        device_updated_cb: DeviceCallbackType | None = None,
+        device_updated_cb: DeviceCallbackType[ClimateMode] | None = None,
     ):
         """Initialize ClimateMode class."""
         super().__init__(xknx, name, device_updated_cb)

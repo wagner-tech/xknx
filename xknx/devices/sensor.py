@@ -8,7 +8,8 @@ It provides functionality for
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Iterator
+from collections.abc import Iterator
+from typing import TYPE_CHECKING, Any
 
 from xknx.remote_value import (
     GroupAddressesType,
@@ -35,7 +36,7 @@ class Sensor(Device):
         sync_state: bool | int | float | str = True,
         always_callback: bool = False,
         value_type: int | str | None = None,
-        device_updated_cb: DeviceCallbackType | None = None,
+        device_updated_cb: DeviceCallbackType[Sensor] | None = None,
     ):
         """Initialize Sensor class."""
         super().__init__(xknx, name, device_updated_cb)

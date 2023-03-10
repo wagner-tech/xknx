@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable
 from enum import Enum
 import logging
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, NamedTuple, Union
+from typing import TYPE_CHECKING, Any, Callable, NamedTuple, Union
 
 from xknx.core import XknxConnectionState
 from xknx.remote_value import RemoteValue
@@ -208,9 +209,8 @@ class StateUpdater:
         if state == XknxConnectionState.CONNECTED:
             if not self.started:
                 self._start()
-        else:
-            if self.started:
-                self._stop()
+        elif self.started:
+            self._stop()
 
 
 class StateTrackerType(Enum):
@@ -265,7 +265,7 @@ class _StateTracker:
     async def _update_loop(self) -> None:
         """Wait for the update_interval to expire. Endless loop for updating states."""
         # for StateUpdaterType.EXPIRE:
-        #   on successfull read the while loop gets canceled when the callback calls update_received()
+        #   on successful read the while loop gets canceled when the callback calls update_received()
         #   when no telegram was received it will try again endlessly
         while True:
             await asyncio.sleep(self.update_interval)

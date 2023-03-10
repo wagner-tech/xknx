@@ -14,9 +14,10 @@ It provides functionality for
 """
 from __future__ import annotations
 
+from collections.abc import Iterator
 from datetime import date, datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Iterator
+from typing import TYPE_CHECKING, Any, Callable
 
 from xknx.remote_value import (
     GroupAddressesType,
@@ -98,7 +99,7 @@ class Weather(Device):
         group_address_air_pressure: GroupAddressesType | None = None,
         group_address_humidity: GroupAddressesType | None = None,
         sync_state: bool | int | float | str = True,
-        device_updated_cb: DeviceCallbackType | None = None,
+        device_updated_cb: DeviceCallbackType[Weather] | None = None,
     ) -> None:
         """Initialize Weather class."""
         super().__init__(xknx, name, device_updated_cb)
@@ -245,7 +246,7 @@ class Weather(Device):
         yield self._air_pressure
         yield self._humidity
 
-    async def process_group_write(self, telegram: "Telegram") -> None:
+    async def process_group_write(self, telegram: Telegram) -> None:
         """Process incoming and outgoing GROUP WRITE telegram."""
         for remote_value in self._iter_remote_values():
             await remote_value.process(telegram)
@@ -333,7 +334,7 @@ class Weather(Device):
             self.brightness_east,
         )
 
-    def ha_current_state(self, current_date: date = date.today()) -> WeatherCondition:
+    def ha_current_state(self, current_date: date | None = None) -> WeatherCondition:
         """Return the current state for home assistant."""
 
         def _get_season(now: date) -> Season:
@@ -357,7 +358,8 @@ class Weather(Device):
         if self.wind_alarm:
             return WeatherCondition.WINDY
 
-        current_season: Season = _get_season(current_date)
+        _current_date = current_date if current_date is not None else date.today()
+        current_season: Season = _get_season(_current_date)
         _season: Season
         function: Callable[[float], bool]
         result: WeatherCondition

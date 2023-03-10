@@ -7,8 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import time
-from typing import Callable, cast
+from typing import Callable
 
 from xknx.exceptions import CommunicationError, CouldNotParseKNXIP, IncompleteKNXIPFrame
 from xknx.knxip import HPAI, HostProtocol, KNXIPFrame
@@ -36,6 +35,19 @@ class TCPTransport(KNXIPTransport):
             self.data_received_callback = data_received_callback
             self.connection_lost_callback = connection_lost_callback
 
+            # Workaround for issue of TCP Transport in ProactorEventLoop in py3.10 and py3.11
+            # on Windows returning bytearray instead of bytes which lead to errors in
+            # cryptography (eg. X25519PublicKey.from_public_bytes() in IP Secure handshake)
+            # https://github.com/python/cpython/issues/99941
+            try:
+                if isinstance(asyncio.get_event_loop(), asyncio.ProactorEventLoop):  # type: ignore[attr-defined]
+                    self.data_received_callback = lambda data: data_received_callback(
+                        bytes(data)
+                    )
+            except AttributeError:
+                # asyncio.ProactorEventLoop is only available on Windows
+                pass
+
         def connection_made(self, transport: asyncio.BaseTransport) -> None:
             """Assign transport. Callback after udp connection was made."""
             self.transport = transport
@@ -62,7 +74,7 @@ class TCPTransport(KNXIPTransport):
         self.callbacks = []
         self._connection_lost_cb = connection_lost_cb
         self.transport: asyncio.Transport | None = None
-        self._buffer = bytes()
+        self._buffer = b""
 
     def data_received_callback(self, raw: bytes) -> None:
         """Parse and process KNXIP frame. Callback for having received data over TCP."""
@@ -72,8 +84,7 @@ class TCPTransport(KNXIPTransport):
         if not raw:
             return
         try:
-            knxipframe = KNXIPFrame()
-            frame_length = knxipframe.from_knx(raw)
+            knxipframe, next_frame_part = KNXIPFrame.from_knx(raw)
         except IncompleteKNXIPFrame:
             self._buffer = raw
             raw_socket_logger.debug(
@@ -82,25 +93,21 @@ class TCPTransport(KNXIPTransport):
             return
         except CouldNotParseKNXIP as couldnotparseknxip:
             knx_logger.debug(
-                "Unsupported KNXIPFrame from %s at %s: %s in %s",
+                "Unsupported KNXIPFrame from %s: %s in %s",
                 self.remote_hpai,
-                time.time(),
                 couldnotparseknxip.description,
                 raw.hex(),
             )
-            if not (frame_length := knxipframe.header.total_length):
-                return
         else:
             knx_logger.debug(
-                "Received from %s at %s:\n%s",
+                "Received from %s: %s",
                 self.remote_hpai,
-                time.time(),
                 knxipframe,
             )
             self.handle_knxipframe(knxipframe, self.remote_hpai)
         # parse data after current KNX/IP frame
-        if len(raw) > frame_length:
-            self.data_received_callback(raw[frame_length:])
+        if next_frame_part:
+            self.data_received_callback(next_frame_part)
 
     async def connect(self) -> None:
         """Connect TCP socket."""
@@ -109,13 +116,11 @@ class TCPTransport(KNXIPTransport):
             connection_lost_callback=self._connection_lost,
         )
         loop = asyncio.get_running_loop()
-        (transport, _) = await loop.create_connection(
+        (self.transport, _) = await loop.create_connection(
             lambda: tcp_transport_factory,
             host=self.remote_hpai.ip_addr,
             port=self.remote_hpai.port,
         )
-        # TODO: typing - remove cast - loop.create_connection should return a asyncio.Transport
-        self.transport = cast(asyncio.Transport, transport)
 
     def _connection_lost(self) -> None:
         """Call assigned callback. Callback for connection lost."""
@@ -128,9 +133,8 @@ class TCPTransport(KNXIPTransport):
     def send(self, knxipframe: KNXIPFrame, addr: tuple[str, int] | None = None) -> None:
         """Send KNXIPFrame to socket. `addr` is ignored on TCP."""
         knx_logger.debug(
-            "Sending to %s at %s:\n%s",
+            "Sending to %s: %s",
             self.remote_hpai,
-            time.time(),
             knxipframe,
         )
         if self.transport is None:

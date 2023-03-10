@@ -22,13 +22,10 @@ that your change is to big and it is suggested to split it into several smaller 
 - [ ] Bug fix (non-breaking change which fixes an issue)
 - [ ] New feature (non-breaking change which adds functionality)
 - [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
-- [ ] This change requires a documentation update
+- [ ] Code quality improvements to existing code or addition of tests
 
-## Checklist:
+## Checklist
 
-- [ ] I have performed a self-review of my own code
 - [ ] The documentation has been adjusted accordingly
-- [ ] The changes generate no new warnings
 - [ ] Tests have been added that prove the fix is effective or that the feature works
-- [ ] The changes are documented in the changelog
-- [ ] The Homeassistant plugin has been adjusted in case of new config options
+- [ ] The changes are documented in the changelog (docs/changelog.md)

@@ -14,9 +14,10 @@ def bytes_xor(a: bytes, b: bytes) -> bytes:  # pylint: disable=invalid-name
 
 
 def byte_pad(data: bytes, block_size: int) -> bytes:
-    """Padd data with 0x00 until its length is a multiple of block_size."""
-    padding = bytes(block_size - (len(data) % block_size))
-    return data + padding
+    """Pad data with 0x00 until its length is a multiple of block_size."""
+    if remainder := len(data) % block_size:
+        return data + bytes(block_size - remainder)
+    return data
 
 
 def sha256_hash(data: bytes) -> bytes:
@@ -29,7 +30,7 @@ def sha256_hash(data: bytes) -> bytes:
 def calculate_message_authentication_code_cbc(
     key: bytes,
     additional_data: bytes,
-    payload: bytes = bytes(),
+    payload: bytes = b"",
     block_0: bytes = bytes(16),
     # counter_0: bytes = bytes(16),
 ) -> bytes:
@@ -52,14 +53,14 @@ def calculate_message_authentication_code_cbc(
 def encrypt_data_ctr(
     key: bytes,
     mac_cbc: bytes,
-    payload: bytes = bytes(),
+    payload: bytes = b"",
     counter_0: bytes = bytes(16),
 ) -> bytes:
     """
     Encrypt data with AES-CTR.
 
     Payload is optional; expected plain KNX/IP frame bytes.
-    MAC shall be encrypted with coutner 0, KNXnet/IP frame with incremented counters.
+    MAC shall be encrypted with counter 0, KNXnet/IP frame with incremented counters.
     Encrypted MAC is appended to the end of encrypted payload data (if there is any).
     """
     s_cipher = Cipher(algorithms.AES(key), modes.CTR(counter_0))
@@ -120,7 +121,7 @@ def calculate_wrapper(
     )
     ctr_0_secure_wrapper = (
         sequence_number + serial_number + message_tag + bytes.fromhex("ff") + bytes(1)
-    )  # last octet is the coutner to increment by 1 each step
+    )  # last octet is the counter to increment by 1 each step
 
     mac_cbc = calculate_message_authentication_code_cbc(
         session_key,

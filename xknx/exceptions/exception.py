@@ -1,6 +1,7 @@
 """Module for XKXN Exceptions."""
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 
@@ -21,13 +22,21 @@ class XKNXException(Exception):
 
 
 class CommunicationError(XKNXException):
-    """Unable to communicate with KNX Bus."""
+    """Unable to communicate with KNX bus."""
 
     def __init__(self, message: str, should_log: bool = True) -> None:
         """Instantiate exception."""
         super().__init__(message)
 
         self.should_log = should_log
+
+
+class ConfirmationError(CommunicationError):
+    """No confirmation received from KNX server for sent Telegram."""
+
+
+class TunnellingAckError(CommunicationError):
+    """No ACK or error status received from UDP KNX server for sent Telegram."""
 
 
 class CouldNotParseTelegram(XKNXException):
@@ -147,17 +156,30 @@ class DeviceIllegalValue(XKNXException):
         return f'<DeviceIllegalValue description="{self.value}" value="{self.description}" />'
 
 
+class DataSecureError(XKNXException):
+    """Exception class for KNX Data Secure handling."""
+
+    def __init__(self, message: str, log_level: int = logging.WARNING) -> None:
+        """Instantiate exception."""
+        super().__init__(message)
+        self.log_level = log_level
+
+
 class SecureException(XKNXException):
-    """Exception class for ip secure handling."""
-
-
-class InvalidSignature(SecureException):
-    """Exception class used when the signature of a knxkeys file is invalid."""
-
-
-class InterfaceWithUserIdNotFound(SecureException):
-    """Exception class used when requesting an interface with a user id that does not exist."""
+    """Exception class for IP secure handling."""
 
 
 class InvalidSecureConfiguration(SecureException):
     """Exception class used when the secure configuration is invalid."""
+
+
+class ManagementConnectionError(XKNXException):
+    """Exception class used when a management connection fails."""
+
+
+class ManagementConnectionRefused(ManagementConnectionError):
+    """Exception class used when a management connection request is refused."""
+
+
+class ManagementConnectionTimeout(ManagementConnectionError):
+    """Exception class used when a management connection timed out."""

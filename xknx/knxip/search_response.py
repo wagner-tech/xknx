@@ -19,9 +19,9 @@ class SearchResponse(KNXIPBody):
 
     SERVICE_TYPE = KNXIPServiceType.SEARCH_RESPONSE
 
-    def __init__(self, control_endpoint: HPAI = HPAI()):
+    def __init__(self, control_endpoint: HPAI | None = None) -> None:
         """Initialize SearchResponse object."""
-        self.control_endpoint = control_endpoint
+        self.control_endpoint = control_endpoint or HPAI()
         self.dibs: list[DIB] = []
 
     def calculated_length(self) -> int:
@@ -40,10 +40,10 @@ class SearchResponse(KNXIPBody):
     @property
     def device_name(self) -> str:
         """Return name of device."""
-        for dib in self.dibs:
-            if isinstance(dib, DIBDeviceInformation):
-                return dib.name
-        return "UNKNOWN"
+        return next(
+            (dib.name for dib in self.dibs if isinstance(dib, DIBDeviceInformation)),
+            "UNKNOWN",
+        )
 
     def to_knx(self) -> bytes:
         """Serialize to KNX/IP raw data."""

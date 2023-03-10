@@ -6,8 +6,9 @@ Module for managing the climate within a room.
 """
 from __future__ import annotations
 
+from collections.abc import Iterator
 import logging
-from typing import TYPE_CHECKING, Any, Iterator
+from typing import TYPE_CHECKING, Any
 
 from xknx.remote_value import (
     GroupAddressesType,
@@ -60,7 +61,7 @@ class Climate(Device):
         min_temp: float | None = None,
         max_temp: float | None = None,
         mode: ClimateMode | None = None,
-        device_updated_cb: DeviceCallbackType | None = None,
+        device_updated_cb: DeviceCallbackType[Climate] | None = None,
     ):
         """Initialize Climate class."""
         super().__init__(xknx, name, device_updated_cb)

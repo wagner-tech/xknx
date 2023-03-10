@@ -9,7 +9,8 @@ It provides functionality for
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterator
+from collections.abc import Iterator
+from typing import TYPE_CHECKING
 
 from xknx.remote_value import GroupAddressesType, RemoteValueNumeric
 
@@ -33,7 +34,7 @@ class NumericValue(Device):
         sync_state: bool | int | float | str = True,
         value_type: int | str | None = None,
         always_callback: bool = False,
-        device_updated_cb: DeviceCallbackType | None = None,
+        device_updated_cb: DeviceCallbackType[NumericValue] | None = None,
     ):
         """Initialize Sensor class."""
         super().__init__(xknx, name, device_updated_cb)

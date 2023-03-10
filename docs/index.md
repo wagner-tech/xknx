@@ -16,12 +16,13 @@ XKNX...
 
 - ... does [cooperative multitasking via asyncio](https://github.com/XKNX/xknx/blob/main/examples/example_light_state.py) and is 100% thread safe.
 - ... provides support for KNX/IP [routing](https://github.com/XKNX/xknx/blob/main/xknx/io/routing.py) _and_ [tunneling](https://github.com/XKNX/xknx/blob/main/xknx/io/tunnel.py) devices.
+- ... supports KNX IP Secure - via tunneling or routing.
+- ... supports KNX Data Secure group communication.
 - ... has strong coverage with [unit tests](https://github.com/XKNX/xknx/tree/main/test).
 - ... automatically updates and synchronizes all devices in the background periodically.
 - ... listens for all updates of all devices on the KNX bus and updates the corresponding internal objects.
 - ... has a clear abstraction of data/network/logic-layer.
-- ... provides Heartbeat monitoring for Tunneling connections + clean reconnect if KNX/IP connection failed.
-- ... does clean [connect](https://github.com/XKNX/xknx/blob/main/xknx/io/connect.py) and [disconnect](https://github.com/XKNX/xknx/blob/main/xknx/io/disconnect.py) requests to the tunneling device.
+- ... does clean [connect](https://github.com/XKNX/xknx/blob/main/xknx/io/connect.py) and [disconnect](https://github.com/XKNX/xknx/blob/main/xknx/io/disconnect.py) requests to the tunneling device and reconnects if KNX/IP connection failed.
 - ... ships with [Home Assistant](https://home-assistant.io/).
 
 ## [](#header-2)Installation
@@ -39,19 +40,16 @@ pip install xknx
 ```python
 import asyncio
 from xknx import XKNX
-from xknx.devices import Light
+from xknx.tools import group_value_write
 
 async def main():
-    xknx = XKNX()
-    await xknx.start()
-    light = Light(xknx,
-                  name='HelloWorldLight',
-                  group_address_switch='1/0/9')
-    await light.set_on()
-    await asyncio.sleep(2)
-    await light.set_off()
-    await asyncio.sleep(2)
-    await xknx.stop()
+    async with XKNX() as xknx:
+        # send a binary Telegram
+        await group_value_write(xknx, "1/2/3", True)
+        # send a generic 1-byte Telegram
+        await group_value_write(xknx, "1/2/4", [0x80])
+        # send a Telegram with an encoded value
+        await group_value_write(xknx, "1/2/4", 50, value_type="percent")
 
 asyncio.run(main())
 ```
@@ -61,3 +59,7 @@ For more examples please check out the [examples page](https://github.com/XKNX/x
 # [](#header-1)Getting Help
 
 For questions, feature requests, bugreports either join the [XKNX chat on Discord](https://discord.gg/EuAQDXU), open an issue at [GitHub](https://github.com/XKNX/xknx) or write an [email](mailto:xknx@xknx.io).
+
+# [](#header-1)Attributions
+
+Many thanks to [MDT technologies GmbH](https://www.mdt.de) and [Weinzierl Engineering GmbH](https://weinzierl.de) for providing us each an IP Secure Router to support testing and development of xknx.

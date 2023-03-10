@@ -29,8 +29,7 @@ class TestKNXIPSecureWrapper:
             + encrypted_data
             + message_authentication_code
         )
-        knxipframe = KNXIPFrame()
-        knxipframe.from_knx(raw)
+        knxipframe, _ = KNXIPFrame.from_knx(raw)
 
         assert isinstance(knxipframe.body, SecureWrapper)
         assert knxipframe.body.secure_session_id == 1
@@ -53,7 +52,4 @@ class TestKNXIPSecureWrapper:
             message_authentication_code=message_authentication_code,
         )
         knxipframe2 = KNXIPFrame.init_from_body(secure_wrapper)
-
-        print(knxipframe2.to_knx().hex())
-        print(raw.hex())
         assert knxipframe2.to_knx() == raw

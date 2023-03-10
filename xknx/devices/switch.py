@@ -9,9 +9,10 @@ It provides functionality for
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Iterator
 from functools import partial
 import logging
-from typing import TYPE_CHECKING, Iterator
+from typing import TYPE_CHECKING
 
 from xknx.core import Task
 from xknx.remote_value import GroupAddressesType, RemoteValueSwitch
@@ -38,7 +39,7 @@ class Switch(Device):
         sync_state: bool | int | float | str = True,
         invert: bool = False,
         reset_after: float | None = None,
-        device_updated_cb: DeviceCallbackType | None = None,
+        device_updated_cb: DeviceCallbackType[Switch] | None = None,
     ):
         """Initialize Switch class."""
         super().__init__(xknx, name, device_updated_cb)

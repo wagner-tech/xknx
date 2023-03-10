@@ -18,7 +18,6 @@ class DPT2ByteUnsigned(DPTNumeric):
     dpt_main_number = 7
     dpt_sub_number: int | None = None
     value_type = "2byte_unsigned"
-    unit = ""
     payload_length = 2
 
     value_min = 0
@@ -111,6 +110,14 @@ class DPTTimePeriodHrs(DPT2ByteUnsigned):
     unit = "h"
 
 
+class DPTPropDataType(DPT2ByteUnsigned):
+    """DPT 7.010 DPT_PropDataType."""
+
+    dpt_main_number = 7
+    dpt_sub_number = 10
+    value_type = "prop_data_type"
+
+
 class DPTLengthMm(DPT2ByteUnsigned):
     """DPT 7.011 Abstraction for KNX 2 Byte DPT_Length_mm (mm)."""
 
@@ -118,6 +125,7 @@ class DPTLengthMm(DPT2ByteUnsigned):
     dpt_sub_number = 11
     value_type = "length_mm"
     unit = "mm"
+    ha_device_class = "distance"
 
 
 class DPTUElCurrentmA(DPT2ByteUnsigned):
@@ -127,6 +135,7 @@ class DPTUElCurrentmA(DPT2ByteUnsigned):
     dpt_sub_number = 12
     value_type = "current"
     unit = "mA"
+    ha_device_class = "current"
 
 
 class DPTBrightness(DPT2ByteUnsigned):
@@ -136,6 +145,7 @@ class DPTBrightness(DPT2ByteUnsigned):
     dpt_sub_number = 13
     value_type = "brightness"
     unit = "lx"
+    ha_device_class = "illuminance"
 
 
 class DPTColorTemperature(DPT2ByteUnsigned):

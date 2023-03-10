@@ -7,9 +7,10 @@ broadcasting localtime periodically.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Iterator
 from functools import partial
 import time
-from typing import TYPE_CHECKING, Iterator
+from typing import TYPE_CHECKING
 
 from xknx.core import Task
 from xknx.remote_value import GroupAddressesType, RemoteValueDateTime
@@ -31,7 +32,7 @@ class DateTime(Device):
         broadcast_type: str = "TIME",
         localtime: bool = True,
         group_address: GroupAddressesType | None = None,
-        device_updated_cb: DeviceCallbackType | None = None,
+        device_updated_cb: DeviceCallbackType[DateTime] | None = None,
     ):
         """Initialize DateTime class."""
         super().__init__(xknx, name, device_updated_cb)

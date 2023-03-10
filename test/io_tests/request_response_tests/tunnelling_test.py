@@ -1,18 +1,19 @@
 """Unit test for KNX/IP Tunnelling Request/Response."""
 from unittest.mock import patch
 
+from xknx.cemi import CEMIFrame
 from xknx.dpt import DPTArray
 from xknx.io.request_response import Tunnelling
 from xknx.io.transport import UDPTransport
 from xknx.knxip import (
     HPAI,
+    ConnectionStateRequest,
     ErrorCode,
     KNXIPFrame,
-    KNXIPServiceType,
     TunnellingAck,
     TunnellingRequest,
 )
-from xknx.telegram import GroupAddress, IndividualAddress, Telegram
+from xknx.telegram import GroupAddress, Telegram
 from xknx.telegram.apci import GroupValueWrite
 
 
@@ -21,35 +22,24 @@ class TestTunnelling:
 
     async def test_tunnelling(self):
         """Test tunnelling from KNX bus."""
-        communication_channel_id = 23
         data_endpoint = ("192.168.1.2", 4567)
         udp_transport = UDPTransport(("192.168.1.1", 0), ("192.168.1.2", 1234))
-        telegram = Telegram(
-            destination_address=GroupAddress("1/2/3"),
-            payload=GroupValueWrite(DPTArray((0x1, 0x2, 0x3))),
+        raw_cemi = CEMIFrame.init_from_telegram(
+            Telegram(
+                destination_address=GroupAddress("1/2/3"),
+                payload=GroupValueWrite(DPTArray((0x1, 0x2, 0x3))),
+            )
+        ).to_knx()
+        tunnelling_request = TunnellingRequest(
+            communication_channel_id=23,
+            sequence_counter=42,
+            raw_cemi=raw_cemi,
         )
-        sequence_counter = 42
-        src_address = IndividualAddress("2.2.2")
-        tunnelling = Tunnelling(
-            udp_transport,
-            data_endpoint,
-            telegram,
-            src_address,
-            sequence_counter,
-            communication_channel_id,
-        )
+        tunnelling = Tunnelling(udp_transport, data_endpoint, tunnelling_request)
         tunnelling.timeout_in_seconds = 0
 
         assert tunnelling.awaited_response_class == TunnellingAck
-        assert tunnelling.communication_channel_id == communication_channel_id
 
-        # Expected KNX/IP-Frame:
-        tunnelling_request = TunnellingRequest(
-            communication_channel_id=communication_channel_id,
-            sequence_counter=sequence_counter,
-        )
-        tunnelling_request.pdu.telegram = telegram
-        tunnelling_request.pdu.src_addr = src_address
         exp_knxipframe = KNXIPFrame.init_from_body(tunnelling_request)
         with patch("xknx.io.transport.UDPTransport.send") as mock_udp_send, patch(
             "xknx.io.transport.UDPTransport.getsockname"
@@ -59,16 +49,15 @@ class TestTunnelling:
             mock_udp_send.assert_called_with(exp_knxipframe, addr=data_endpoint)
 
         # Response KNX/IP-Frame with wrong type
-        wrong_knxipframe = KNXIPFrame()
-        wrong_knxipframe.init(KNXIPServiceType.CONNECTIONSTATE_REQUEST)
+        wrong_knxipframe = KNXIPFrame.init_from_body(ConnectionStateRequest())
         with patch("logging.Logger.warning") as mock_warning:
             tunnelling.response_rec_callback(wrong_knxipframe, HPAI(), None)
             mock_warning.assert_called_with("Could not understand knxipframe")
 
         # Response KNX/IP-Frame with error:
-        err_knxipframe = KNXIPFrame()
-        err_knxipframe.init(KNXIPServiceType.TUNNELLING_ACK)
-        err_knxipframe.body.status_code = ErrorCode.E_CONNECTION_ID
+        err_knxipframe = KNXIPFrame.init_from_body(
+            TunnellingAck(status_code=ErrorCode.E_CONNECTION_ID)
+        )
         with patch("logging.Logger.debug") as mock_warning:
             tunnelling.response_rec_callback(err_knxipframe, HPAI(), None)
             mock_warning.assert_called_with(
@@ -79,7 +68,6 @@ class TestTunnelling:
             )
 
         # Correct Response KNX/IP-Frame:
-        res_knxipframe = KNXIPFrame()
-        res_knxipframe.init(KNXIPServiceType.TUNNELLING_ACK)
+        res_knxipframe = KNXIPFrame.init_from_body(TunnellingAck())
         tunnelling.response_rec_callback(res_knxipframe, HPAI(), None)
         assert tunnelling.success

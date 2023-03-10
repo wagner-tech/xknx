@@ -11,9 +11,10 @@ A BinarySensor may also have Actions attached which are executed after state was
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Iterator
 from functools import partial
 import time
-from typing import TYPE_CHECKING, Iterator, cast
+from typing import TYPE_CHECKING, cast
 
 from xknx.core import Task
 from xknx.remote_value import GroupAddressesType, RemoteValueSwitch
@@ -38,7 +39,7 @@ class BinarySensor(Device):
         ignore_internal_state: bool = False,
         reset_after: float | None = None,
         context_timeout: float | None = None,
-        device_updated_cb: DeviceCallbackType | None = None,
+        device_updated_cb: DeviceCallbackType[BinarySensor] | None = None,
     ):
         """Initialize BinarySensor class."""
         super().__init__(xknx, name, device_updated_cb)
