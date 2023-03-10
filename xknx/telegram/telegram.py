@@ -31,16 +31,6 @@ class Priority(Enum):
     LOW = 3
 
 
-class TPDUType(Enum):
-    """Types of TPDU."""
-
-    T_DATA = 0
-    T_CONNECT = 1
-    T_DISCONNECT = 2
-    T_ACK = 3
-    T_NAK = 4
-
-
 class TelegramDirection(Enum):
     """Enum class for the communication direction of a telegram (from KNX bus or to KNX bus)."""
 

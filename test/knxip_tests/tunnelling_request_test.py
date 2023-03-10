@@ -40,11 +40,7 @@ class TestKNXIPTunnellingRequest:
         tunnelling_request = TunnellingRequest(
             communication_channel_id=1,
             sequence_counter=23,
-<<<<<<< HEAD
-            pdu=cemi,
-=======
             raw_cemi=outgoing_cemi.to_knx(),
->>>>>>> 2.6.0
         )
         knxipframe2 = KNXIPFrame.init_from_body(tunnelling_request)
 

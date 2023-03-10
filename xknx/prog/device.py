@@ -10,7 +10,6 @@ from xknx.telegram import (
     Priority,
     Telegram,
     TelegramDirection,
-    TPDUType,
 )
 from xknx.telegram.address import GroupAddress, GroupAddressType
 from xknx.telegram.apci import (
@@ -24,6 +23,11 @@ from xknx.telegram.apci import (
     MemoryWrite,
     PropertyValueRead,
     Restart,
+)
+from xknx.telegram.tpci import (
+    TAck,
+    TConnect,
+    TDisconnect, TDataConnected,
 )
 
 if TYPE_CHECKING:
@@ -100,7 +104,7 @@ class ProgDevice:
     async def t_connect(self) -> None:
         """Perform a T_Connect."""
         telegram = Telegram(
-            self.ind_add, TelegramDirection.OUTGOING, None, None, TPDUType.T_CONNECT
+            self.ind_add, tpci=TConnect()
         )
         await self.xknx.telegrams.put(telegram)
 
@@ -110,25 +114,20 @@ class ProgDevice:
         while True:
             await asyncio.sleep(0.1)
             if self.last_telegram:
-                if self.last_telegram.tpdu_type == TPDUType.T_DISCONNECT:
+                if isinstance(self.last_telegram.tpci, TDisconnect):
                     return
 
     async def t_disconnect(self) -> None:
         """Perform a T_Disconnect."""
         telegram = Telegram(
-            self.ind_add, TelegramDirection.OUTGOING, None, None, TPDUType.T_DISCONNECT
+            self.ind_add, tpci=TDisconnect()
         )
         await self.xknx.telegrams.put(telegram)
 
     async def t_ack(self, numbered: bool = False) -> None:
         """Perform a T_ACK."""
-        if numbered:
-            tpdu_type = TPDUType.T_ACK_NUMBERED
-        else:
-            tpdu_type = TPDUType.T_ACK
-
         telegram = Telegram(
-            self.ind_add, TelegramDirection.OUTGOING, None, None, tpdu_type
+            self.ind_add, tpci=TAck(self.sequence_number)
         )
         await self.xknx.telegrams.put(telegram)
 
@@ -137,7 +136,8 @@ class ProgDevice:
         telegram = Telegram(
             self.ind_add,
             TelegramDirection.OUTGOING,
-            DeviceDescriptorRead(descriptor, sequence_number=self.sequence_number),
+            DeviceDescriptorRead(descriptor),
+            tpci=TDataConnected(self.sequence_number),
             priority=Priority.SYSTEM,
         )
         self.sequence_number += 1
@@ -161,7 +161,8 @@ class ProgDevice:
         telegram = Telegram(
             self.ind_add,
             TelegramDirection.OUTGOING,
-            PropertyValueRead(0, 0x0B, 1, 1, True, 1),
+            PropertyValueRead(0, 0x0B, 1, 1),
+            tpci=TDataConnected(self.sequence_number),
             priority=Priority.SYSTEM,
         )
         await self.xknx.telegrams.put(telegram)
@@ -208,14 +209,12 @@ class ProgDevice:
     ) -> None:
         """Perform a Memory_Read."""
         if is_numbered:
-            mr = MemoryRead(address, count, sequence_number=self.sequence_number)
             self.sequence_number += 1
-        else:
-            mr = MemoryRead(address, count)
         telegram = Telegram(
             self.ind_add,
             TelegramDirection.OUTGOING,
-            mr,
+            MemoryRead(address, count),
+            tpci=TDataConnected(self.sequence_number),
             priority=Priority.SYSTEM,
         )
         await self.xknx.telegrams.put(telegram)
@@ -236,15 +235,15 @@ class ProgDevice:
                         )
 
     async def memory_write(
-        self, address: int = 0, count: int = 0, data: bytes = None
+        self, address: int = 0, count: int = 0, data: bytes = bytes()
     ) -> None:
         """Perform a PropertyValue_Write"""
-        mw = MemoryWrite(address, count, data, sequence_number=self.sequence_number)
-        self.sequence_number += 3
+        self.sequence_number += 1
         telegram = Telegram(
             self.ind_add,
             TelegramDirection.OUTGOING,
-            mw,
+            MemoryWrite(address, data, count),
+            tpci=TDataConnected(self.sequence_number),
             priority=Priority.SYSTEM,
         )
         await self.xknx.telegrams.put(telegram)
@@ -254,7 +253,8 @@ class ProgDevice:
         telegram = Telegram(
             self.ind_add,
             TelegramDirection.OUTGOING,
-            Restart(sequence_number=2),
+            Restart(),
+            tpci=TDataConnected(self.sequence_number),
             priority=Priority.SYSTEM,
         )
         await self.xknx.telegrams.put(telegram)

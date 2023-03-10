@@ -23,20 +23,12 @@ def encode_cmd_and_payload(
     cmd: APCIService | APCIUserService | APCIExtendedService,
     encoded_payload: int = 0,
     appended_payload: bytes | None = None,
-    additional_flags: APCIAdditionalFlags | None = None,
 ) -> bytearray:
     """Encode cmd and payload."""
-    if appended_payload is None:
-        appended_payload = bytes()
-
-    command_and_flag = cmd.value
-    if additional_flags:
-        command_and_flag |= additional_flags.value | ((sequence_number & 0x0F) << 10)
-
     data = bytearray(
         [
-            (command_and_flag >> 8) & 0xFF,
-            (command_and_flag & 0xFF) | (encoded_payload & DPTBinary.APCI_BITMASK),
+            (cmd.value >> 8) & 0b11,
+            (cmd.value & 0xFF) | (encoded_payload & DPTBinary.APCI_BITMASK),
         ]
     )
     if appended_payload:
@@ -108,12 +100,6 @@ class APCIExtendedService(Enum):
     APCI_SEC = 0x03F1
 
 
-class APCIAdditionalFlags(Enum):
-    """APCI Additional Flags."""
-
-    NUMBERED_DATA_PACKET = 0x4000
-
-
 class APCI(ABC):
     """
     Base class for ACPI services.
@@ -135,9 +121,6 @@ class APCI(ABC):
         # shall return bytearray instead of bytes so TPCI can be
         # added to first 6 bits of first byte later
 
-    def eval_tpci(self, tpci_apci) -> None:
-        self.sequence_number = ((tpci_apci >> 10) & 3)
-        
     def __eq__(self, other: object) -> bool:
         """Equal operator."""
         if self.__class__ != other.__class__:
@@ -369,7 +352,7 @@ class IndividualAddressWrite(APCI):
 
     def __str__(self) -> str:
         """Return object as readable string."""
-        return f'<IndividualAddressWrite SN={self.sequence_number} address="{self.address}" />'
+        return f'<IndividualAddressWrite address="{self.address}" />'
 
 
 class IndividualAddressRead(APCI):
@@ -393,7 +376,7 @@ class IndividualAddressRead(APCI):
 
     def __str__(self) -> str:
         """Return object as readable string."""
-        return f"<IndividualAddressRead SN={self.sequence_number} />"
+        return "<IndividualAddressRead />"
 
 
 class IndividualAddressResponse(APCI):
@@ -422,7 +405,7 @@ class IndividualAddressResponse(APCI):
 
     def __str__(self) -> str:
         """Return object as readable string."""
-        return f"<IndividualAddressResponse SN={self.sequence_number} />"
+        return "<IndividualAddressResponse />"
 
 
 class ADCRead(APCI):
@@ -522,10 +505,6 @@ class MemoryRead(APCI):
         """Initialize a new instance of MemoryRead."""
         self.address = address
         self.count = count
-        self.additional_flags = None
-        self.sequence_number = sequence_number or 0
-        if self.sequence_number:
-            self.additional_flags = APCIAdditionalFlags.NUMBERED_DATA_PACKET
 
     def calculated_length(self) -> int:
         """Get length of APCI payload."""
@@ -551,16 +530,12 @@ class MemoryRead(APCI):
         payload = struct.pack("!BH", self.count, self.address)
 
         return encode_cmd_and_payload(
-            self.CODE, 
-            encoded_payload=payload[0], 
-            appended_payload=payload[1:],
-            additional_flags=self.additional_flags,
-            sequence_number=self.sequence_number,
+            self.CODE, encoded_payload=payload[0], appended_payload=payload[1:]
         )
 
     def __str__(self) -> str:
         """Return object as readable string."""
-        return f'<MemoryRead SN={self.sequence_number} address="{hex(self.address)}" count="{self.count}" />'
+        return f'<MemoryRead address="{hex(self.address)}" count="{self.count}" />'
 
 
 class MemoryWrite(APCI):
@@ -579,7 +554,6 @@ class MemoryWrite(APCI):
         self.address = address
         self.count = count
         self.data = data
-        self.additional_flags = None
 
     def calculated_length(self) -> int:
         """Get length of APCI payload."""
@@ -609,15 +583,12 @@ class MemoryWrite(APCI):
         payload = struct.pack(f"!BH{size}s", self.count, self.address, self.data)
 
         return encode_cmd_and_payload(
-            self.CODE, encoded_payload=payload[0], 
-            appended_payload=payload[1:],
-            additional_flags=self.additional_flags,
-            sequence_number=self.sequence_number,
+            self.CODE, encoded_payload=payload[0], appended_payload=payload[1:]
         )
 
     def __str__(self) -> str:
         """Return object as readable string."""
-        return f'<MemoryWrite SN={self.sequence_number} address="{hex(self.address)}" count="{self.count}" data="{self.data.hex()}" />'
+        return f'<MemoryWrite address="{hex(self.address)}" count="{self.count}" data="{self.data.hex()}" />'
 
 
 class MemoryResponse(APCI):
@@ -635,7 +606,7 @@ class MemoryResponse(APCI):
             count = len(data)
         self.address = address
         self.count = count
-        self.data = data or bytearray()
+        self.data = data
 
     def calculated_length(self) -> int:
         """Get length of APCI payload."""
@@ -670,7 +641,7 @@ class MemoryResponse(APCI):
 
     def __str__(self) -> str:
         """Return object as readable string."""
-        return f'<MemoryResponse SN={self.sequence_number} address="{hex(self.address)}" count="{self.count}" data="{self.data.hex()}" />'
+        return f'<MemoryResponse address="{hex(self.address)}" count="{self.count}" data="{self.data.hex()}" />'
 
 
 class DeviceDescriptorRead(APCI):
@@ -682,12 +653,9 @@ class DeviceDescriptorRead(APCI):
 
     CODE = APCIService.DEVICE_DESCRIPTOR_READ
 
-    def __init__(self, descriptor: int = 0, sequence_number:int = 0) -> None:
+    def __init__(self, descriptor: int = 0) -> None:
         """Initialize a new instance of DeviceDescriptorRead."""
         self.descriptor = descriptor
-        self.additional_flags = None
-        self.sequence_number = sequence_number
-        self.additional_flags = APCIAdditionalFlags.NUMBERED_DATA_PACKET
 
     def calculated_length(self) -> int:
         """Get length of APCI payload."""
@@ -703,16 +671,11 @@ class DeviceDescriptorRead(APCI):
         if not 0 <= self.descriptor <= 0x3F:
             raise ConversionError("Descriptor out of range.")
 
-        return encode_cmd_and_payload(
-            self.CODE,
-            encoded_payload=self.descriptor,
-            additional_flags=self.additional_flags,
-            sequence_number=self.sequence_number,
-        )
+        return encode_cmd_and_payload(self.CODE, encoded_payload=self.descriptor)
 
     def __str__(self) -> str:
         """Return object as readable string."""
-        return f'<DeviceDescriptorRead SN={self.sequence_number} descriptor="{self.descriptor}" />'
+        return f'<DeviceDescriptorRead descriptor="{self.descriptor}" />'
 
 
 class DeviceDescriptorResponse(APCI):
@@ -753,7 +716,7 @@ class DeviceDescriptorResponse(APCI):
 
     def __str__(self) -> str:
         """Return object as readable string."""
-        return f'<DeviceDescriptorResponse SN={self.sequence_number} descriptor="{self.descriptor}" value="{self.value}" />'
+        return f'<DeviceDescriptorResponse descriptor="{self.descriptor}" value="{self.value}" />'
 
 
 class Restart(APCI):
@@ -768,10 +731,6 @@ class Restart(APCI):
 
     CODE = APCIService.RESTART
 
-    def __init__(self, sequence_number: int = 0) -> None:
-        """Initialize a new instance of Restart."""
-        self.sequence_number = sequence_number
-
     def calculated_length(self) -> int:
         """Get length of APCI payload."""
         return 1
@@ -784,19 +743,11 @@ class Restart(APCI):
 
     def to_knx(self) -> bytearray:
         """Serialize to KNX/IP raw data."""
-        additional_flags = None
-        if self.sequence_number:
-            additional_flags = APCIAdditionalFlags.NUMBERED_DATA_PACKET
-
-        return encode_cmd_and_payload(
-            self.CODE,
-            additional_flags=additional_flags,
-            sequence_number=self.sequence_number,
-        )
+        return encode_cmd_and_payload(self.CODE)
 
     def __str__(self) -> str:
         """Return object as readable string."""
-        return f"<Restart SN={self.sequence_number} />"
+        return "<Restart />"
 
 
 class UserMemoryRead(APCI):
@@ -1229,18 +1180,12 @@ class PropertyValueRead(APCI):
         property_id: int = 0,
         count: int = 1,
         start_index: int = 1,
-        is_numbered: bool = False,
-        sequence_number: int = 0,
     ) -> None:
         """Initialize a new instance of PropertyValueRead."""
         self.object_index = object_index
         self.property_id = property_id
         self.count = count
         self.start_index = start_index
-        self.additional_flags = None
-        if is_numbered:
-            self.additional_flags = APCIAdditionalFlags.NUMBERED_DATA_PACKET
-        self.sequence_number = sequence_number
 
     def calculated_length(self) -> int:
         """Get length of APCI payload."""
@@ -1275,18 +1220,12 @@ class PropertyValueRead(APCI):
             self.start_index & 0xFF,
         )
 
-        return encode_cmd_and_payload(
-            self.CODE,
-            appended_payload=payload,
-            additional_flags=self.additional_flags,
-            sequence_number=self.sequence_number,
-        )
+        return encode_cmd_and_payload(self.CODE, appended_payload=payload)
 
     def __str__(self) -> str:
         """Return object as readable string."""
         return (
             "<PropertyValueRead "
-            f'SN={self.sequence_number} ' 
             f'object_index="{self.object_index}" '
             f'property_id="{self.property_id}" '
             f'count="{self.count}" '
