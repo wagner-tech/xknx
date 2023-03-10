@@ -135,6 +135,9 @@ class APCI(ABC):
         # shall return bytearray instead of bytes so TPCI can be
         # added to first 6 bits of first byte later
 
+    def eval_tpci(self, tpci_apci) -> None:
+        self.sequence_number = ((tpci_apci >> 10) & 3)
+        
     def __eq__(self, other: object) -> bool:
         """Equal operator."""
         if self.__class__ != other.__class__:
@@ -366,7 +369,7 @@ class IndividualAddressWrite(APCI):
 
     def __str__(self) -> str:
         """Return object as readable string."""
-        return f'<IndividualAddressWrite address="{self.address}" />'
+        return f'<IndividualAddressWrite SN={self.sequence_number} address="{self.address}" />'
 
 
 class IndividualAddressRead(APCI):
@@ -390,7 +393,7 @@ class IndividualAddressRead(APCI):
 
     def __str__(self) -> str:
         """Return object as readable string."""
-        return "<IndividualAddressRead />"
+        return f"<IndividualAddressRead SN={self.sequence_number} />"
 
 
 class IndividualAddressResponse(APCI):
@@ -419,7 +422,7 @@ class IndividualAddressResponse(APCI):
 
     def __str__(self) -> str:
         """Return object as readable string."""
-        return "<IndividualAddressResponse />"
+        return f"<IndividualAddressResponse SN={self.sequence_number} />"
 
 
 class ADCRead(APCI):
@@ -519,6 +522,10 @@ class MemoryRead(APCI):
         """Initialize a new instance of MemoryRead."""
         self.address = address
         self.count = count
+        self.additional_flags = None
+        self.sequence_number = sequence_number or 0
+        if self.sequence_number:
+            self.additional_flags = APCIAdditionalFlags.NUMBERED_DATA_PACKET
 
     def calculated_length(self) -> int:
         """Get length of APCI payload."""
@@ -544,12 +551,16 @@ class MemoryRead(APCI):
         payload = struct.pack("!BH", self.count, self.address)
 
         return encode_cmd_and_payload(
-            self.CODE, encoded_payload=payload[0], appended_payload=payload[1:]
+            self.CODE, 
+            encoded_payload=payload[0], 
+            appended_payload=payload[1:],
+            additional_flags=self.additional_flags,
+            sequence_number=self.sequence_number,
         )
 
     def __str__(self) -> str:
         """Return object as readable string."""
-        return f'<MemoryRead address="{hex(self.address)}" count="{self.count}" />'
+        return f'<MemoryRead SN={self.sequence_number} address="{hex(self.address)}" count="{self.count}" />'
 
 
 class MemoryWrite(APCI):
@@ -568,6 +579,7 @@ class MemoryWrite(APCI):
         self.address = address
         self.count = count
         self.data = data
+        self.additional_flags = None
 
     def calculated_length(self) -> int:
         """Get length of APCI payload."""
@@ -597,12 +609,15 @@ class MemoryWrite(APCI):
         payload = struct.pack(f"!BH{size}s", self.count, self.address, self.data)
 
         return encode_cmd_and_payload(
-            self.CODE, encoded_payload=payload[0], appended_payload=payload[1:]
+            self.CODE, encoded_payload=payload[0], 
+            appended_payload=payload[1:],
+            additional_flags=self.additional_flags,
+            sequence_number=self.sequence_number,
         )
 
     def __str__(self) -> str:
         """Return object as readable string."""
-        return f'<MemoryWrite address="{hex(self.address)}" count="{self.count}" data="{self.data.hex()}" />'
+        return f'<MemoryWrite SN={self.sequence_number} address="{hex(self.address)}" count="{self.count}" data="{self.data.hex()}" />'
 
 
 class MemoryResponse(APCI):
@@ -620,7 +635,7 @@ class MemoryResponse(APCI):
             count = len(data)
         self.address = address
         self.count = count
-        self.data = data
+        self.data = data or bytearray()
 
     def calculated_length(self) -> int:
         """Get length of APCI payload."""
@@ -655,7 +670,7 @@ class MemoryResponse(APCI):
 
     def __str__(self) -> str:
         """Return object as readable string."""
-        return f'<MemoryResponse address="{hex(self.address)}" count="{self.count}" data="{self.data.hex()}" />'
+        return f'<MemoryResponse SN={self.sequence_number} address="{hex(self.address)}" count="{self.count}" data="{self.data.hex()}" />'
 
 
 class DeviceDescriptorRead(APCI):
@@ -667,12 +682,12 @@ class DeviceDescriptorRead(APCI):
 
     CODE = APCIService.DEVICE_DESCRIPTOR_READ
 
-    def __init__(self, descriptor: int = 0, is_numbered: bool = False) -> None:
+    def __init__(self, descriptor: int = 0, sequence_number:int = 0) -> None:
         """Initialize a new instance of DeviceDescriptorRead."""
         self.descriptor = descriptor
         self.additional_flags = None
-        if is_numbered:
-            self.additional_flags = APCIAdditionalFlags.NUMBERED_DATA_PACKET
+        self.sequence_number = sequence_number
+        self.additional_flags = APCIAdditionalFlags.NUMBERED_DATA_PACKET
 
     def calculated_length(self) -> int:
         """Get length of APCI payload."""
@@ -692,11 +707,12 @@ class DeviceDescriptorRead(APCI):
             self.CODE,
             encoded_payload=self.descriptor,
             additional_flags=self.additional_flags,
+            sequence_number=self.sequence_number,
         )
 
     def __str__(self) -> str:
         """Return object as readable string."""
-        return f'<DeviceDescriptorRead descriptor="{self.descriptor}" />'
+        return f'<DeviceDescriptorRead SN={self.sequence_number} descriptor="{self.descriptor}" />'
 
 
 class DeviceDescriptorResponse(APCI):
@@ -737,7 +753,7 @@ class DeviceDescriptorResponse(APCI):
 
     def __str__(self) -> str:
         """Return object as readable string."""
-        return f'<DeviceDescriptorResponse descriptor="{self.descriptor}" value="{self.value}" />'
+        return f'<DeviceDescriptorResponse SN={self.sequence_number} descriptor="{self.descriptor}" value="{self.value}" />'
 
 
 class Restart(APCI):
@@ -780,7 +796,7 @@ class Restart(APCI):
 
     def __str__(self) -> str:
         """Return object as readable string."""
-        return "<Restart />"
+        return f"<Restart SN={self.sequence_number} />"
 
 
 class UserMemoryRead(APCI):
@@ -1270,6 +1286,7 @@ class PropertyValueRead(APCI):
         """Return object as readable string."""
         return (
             "<PropertyValueRead "
+            f'SN={self.sequence_number} ' 
             f'object_index="{self.object_index}" '
             f'property_id="{self.property_id}" '
             f'count="{self.count}" '

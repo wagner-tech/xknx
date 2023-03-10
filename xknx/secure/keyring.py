@@ -462,7 +462,7 @@ def sync_load_keyring(
     keyring: Keyring = Keyring()
     try:
         with open(path, encoding="utf-8") as file:
-            dom: Document = parse(file)
+            dom: Document = parse(str(file))
             keyring.parse_xml(dom.getElementsByTagName("Keyring")[0])
 
         keyring.decrypt(password)

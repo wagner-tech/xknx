@@ -38,7 +38,7 @@ class TPDUType(Enum):
     T_CONNECT = 1
     T_DISCONNECT = 2
     T_ACK = 3
-    T_ACK_NUMBERED = 4
+    T_NAK = 4
 
 
 class TelegramDirection(Enum):
@@ -59,6 +59,7 @@ class Telegram:
         source_address: IndividualAddress | None = None,
         tpci: TPCI | None = None,
         priority: Priority = Priority.LOW,
+        sequence_number = 0
     ) -> None:
         """Initialize Telegram class."""
         self.destination_address = destination_address

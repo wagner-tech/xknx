@@ -1,0 +1,6 @@
+!|test.util.CallScript|
+|call script|mkdir -p ~/tmp/xknx/prog|
+|call script|rsync -a --delete /usr/lib/python3/dist-packages/xknx/prog ~/tmp/xknx/prog|
+|call script|mypy --ignore-missing-imports ~/tmp/xknx/prog|
+|call script|rsync -a --delete ../test/ ~/tmp/test/|
+|call script|pytest-3 ~/tmp/test/prog_tests/|
