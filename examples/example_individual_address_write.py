@@ -2,7 +2,7 @@
 import asyncio
 
 from xknx import XKNX
-from xknx.prog.management import NM_EXISTS, NM_OK, NM_TIME_OUT, NetworkManagement
+from xknx.prog.dev_management import NM_EXISTS, NM_OK, NM_TIME_OUT, NetworkManagement
 from xknx.telegram.address import IndividualAddress
 
 import logging

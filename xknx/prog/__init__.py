@@ -7,7 +7,7 @@ This package contains objects for programming a device.
 from .device import ProgDevice
 
 # flake8: noqa
-from .management import NetworkManagement
+from xknx.prog.dev_management import NetworkManagement
 
 __all__ = [
     "NetworkManagement",

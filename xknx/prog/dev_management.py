@@ -1,11 +1,13 @@
 """This modul implements the management procedures as described in KNX-Standard 3.5.2."""
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 import asyncio
 from typing import TYPE_CHECKING
 
 from xknx.prog.device import ProgDevice, create_and_connect, ConnectionState
 from xknx.telegram.address import GroupAddress, IndividualAddress
+from _operator import add
 
 if TYPE_CHECKING:
     from xknx.telegram import Telegram
@@ -24,8 +26,6 @@ class NetworkManagement:
     def __init__(self, xknx: XKNX):
         """Construct NM instance."""
         self.xknx = xknx
-        xknx.telegram_queue.register_telegram_received_cb(self.telegram_received_cb)
-        # map for registered devices
         self._managed_dev: ProgDevice|None = None
 
     @property
@@ -72,7 +72,7 @@ class NetworkManagement:
         await self.managed_dev.individualaddress_write()
 
         # Addition from ETS reverse engeneering
-        await self.set_managed_dev(await create_and_connect(self.xknx, ind_add))
+        await self.managed_dev.connect()
         await self.managed_dev.propertyvalue_read()
         await self.managed_dev.restart()
         await asyncio.sleep(1)
@@ -81,7 +81,6 @@ class NetworkManagement:
         return NM_OK
 
     async def switch_led(self, value: int) -> int:
-        # define device
 
         if value == 0:
             resp = await self.read_memory(96, 1)
@@ -123,3 +122,17 @@ class NetworkManagement:
         if rcount != count:
             raise RuntimeError("Cound not read number of bytes: "+str(count))
         return data
+
+    @asynccontextmanager
+    async def connect_device(self, address: IndividualAddress):
+        """Provide a connected device."""
+        rc = await self.connect_managed_device(address)
+        if rc != NM_OK:
+            raise RuntimeError("Could not connect device.")
+        try:
+            yield self
+        finally:
+            await self.disconnect_managed_device()
+
+    
+    
