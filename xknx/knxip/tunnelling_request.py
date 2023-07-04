@@ -67,5 +67,5 @@ class TunnellingRequest(KNXIPBody):
             f'communication_channel_id="{self.communication_channel_id}" '
             f'sequence_counter="{self.sequence_counter}" '
             f'raw_cemi="{self.raw_cemi.hex()}" '
-            f'cemi="{self.cemi}" />'
+            #f'cemi="{self.cemi}" />'
         )

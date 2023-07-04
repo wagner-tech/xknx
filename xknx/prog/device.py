@@ -140,7 +140,6 @@ class ProgDevice:
                         == APCIService.DEVICE_DESCRIPTOR_RESPONSE
                     ):
                         return
-
     async def individualaddress_read(self) -> None:
         """Perform a IndividualAddress_Read."""
         telegram = Telegram(
@@ -150,6 +149,8 @@ class ProgDevice:
             priority=Priority.SYSTEM,
         )
         await self.xknx.telegrams.put(telegram)
+
+
 
     '''
 
@@ -187,15 +188,17 @@ class ProgDevice:
 
     async def individualaddress_read_response(self) -> IndividualAddress | None:
         """Process a IndividualAddress_Read_Response."""
+        special_connection = await self.xknx.management.register_special()
         while True:
-            try:
-                response = await self.p2p_connection.request(
-                    payload=IndividualAddressRead(),
-                    expected=apci.IndividualAddressResponse,
-                )
-                return response.source_address
-            except ManagementConnectionTimeout:
-                pass 
+            response = await special_connection.request(
+                payload=IndividualAddressRead(),
+                expected=apci.IndividualAddressResponse,
+            )
+            if response:
+                return response
+            
+            await asyncio.sleep(2)
+            
 
     async def individualaddress_write(self) -> None:
         """Perform a IndividualAddress_Write."""

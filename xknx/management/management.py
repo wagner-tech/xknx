@@ -14,9 +14,10 @@ from xknx.exceptions import (
     ManagementConnectionRefused,
     ManagementConnectionTimeout,
 )
-from xknx.telegram import IndividualAddress, Telegram
+from xknx.telegram import IndividualAddress, GroupAddress, Telegram
 from xknx.telegram.apci import APCI
 from xknx.telegram.tpci import TAck, TConnect, TDataConnected, TDisconnect, TNak
+from pygments.unistring import Sc
 
 if TYPE_CHECKING:
     from xknx.xknx import XKNX
@@ -45,6 +46,9 @@ class Management:
                 self.xknx.cemi_handler.send_telegram(ack)
             )
         if conn := self._connections.get(telegram.source_address):
+            conn.process(telegram)
+            return
+        if (conn := self._connections.get(GroupAddress(0))) and telegram.destination_address == GroupAddress(0):
             conn.process(telegram)
             return
         if telegram.tpci.numbered:
@@ -88,7 +92,13 @@ class Management:
 
         p2p_connection.disconnect_hook = remove_connection_hook
         return p2p_connection
-
+    async def register_special(self) -> SimpleConnection:
+        if GroupAddress(0) in self._connections:
+            raise ManagementConnectionError(f"Special Address 0/0/0 already exists.")
+        sc = SimpleConnection(self.xknx)
+        self._connections[GroupAddress(0)] = sc
+        return sc
+    
     async def disconnect(self, address: IndividualAddress) -> None:
         """Close a point-to-point connection to a KNX device."""
         connection = self._connections.get(address)
@@ -303,3 +313,90 @@ class P2PConnection:
             )
         await self._send_data(payload)
         return await self._receive(expected)
+
+class SimpleConnection (P2PConnection):
+    def __init__(self, xknx: XKNX):
+        self.xknx = xknx
+        self._connected = True
+        self._response_waiter: asyncio.Future[
+            Telegram
+        ] = asyncio.get_event_loop().create_future()
+    
+    async def request(self, payload: APCI, expected: type[APCI] | None) -> Telegram:
+        """Send a payload to the KNX device and wait for the response."""
+        await self._send_data(payload)
+        return await self._receive(expected)
+
+    async def _send_data(self, payload: APCI) -> None:
+        """
+        Send a payload to the KNX device.
+
+        A response has to be processed by `_receive` before sending the next telegram.
+        """
+        self._ack_waiter = asyncio.get_event_loop().create_future()
+
+        telegram = Telegram(
+            destination_address=GroupAddress(0),
+            source_address=self.xknx.current_address,
+            payload=payload,
+        )
+        try:
+            await self.xknx.cemi_handler.send_telegram(telegram)
+        except asyncio.TimeoutError:
+            logger.info(
+                "%s: timeout while waiting for ACK. Resending Telegram.", self.address
+            )
+            # resend once after 3 seconds without ACK
+            # on timeout the Future is cancelled so create a new
+            self._ack_waiter = asyncio.get_event_loop().create_future()
+            await self.xknx.cemi_handler.send_telegram(telegram)
+            try:
+                ack = await asyncio.wait_for(self._ack_waiter, MANAGAMENT_ACK_TIMEOUT)
+            except asyncio.TimeoutError:
+                raise ManagementConnectionTimeout(
+                    "No ACK received for repeated telegram."
+                ) from None
+        except ConfirmationError as exc:
+            raise ManagementConnectionError(
+                f"Error while sending Telegram: {exc}"
+            ) from exc
+        except CommunicationError as exc:
+            raise ManagementConnectionError("Error while sending Telegram") from exc
+        finally:
+            self._ack_waiter = None
+
+    async def _receive(self, expected_payload: type[APCI] | None) -> Telegram:
+        """Wait for a telegram from the KNX device."""
+        telegram = None
+        try:
+            telegram = await asyncio.wait_for(
+                self._response_waiter, timeout=MANAGAMENT_CONNECTION_TIMEOUT
+            )
+        except asyncio.TimeoutError:
+            pass # waiting for PROG takes looong
+        
+        finally:
+            # set up new Future for the next request
+            self._response_waiter = asyncio.get_event_loop().create_future()
+
+        if telegram and expected_payload and isinstance(telegram.payload, expected_payload):
+            return telegram
+
+        return None
+
+    def process(self, telegram: Telegram) -> None:
+        """Process incoming telegrams."""
+        if isinstance(telegram.tpci, (TAck, TNak)):
+            if not self._ack_waiter:
+                logger.warning("Received unexpected ACK/NAK: %s", telegram)
+                return
+            self._ack_waiter.set_result(telegram.tpci)
+            return
+        if self._response_waiter.done():
+            logger.warning(
+                "Received unexpected point-to-point telegram for %s: %s",
+                self.address,
+                telegram,
+            )
+            return
+        self._response_waiter.set_result(telegram)
