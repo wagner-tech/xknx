@@ -169,6 +169,7 @@ class ProgDevice:
             except ManagementConnectionTimeout as ex:
                 # if nothing is received (-> timeout) IA is free
                 logger.debug("No device answered to connection attempt. %s", ex)
+                await self.p2p_connection.disconnect()
                 return False
             if isinstance(response.payload, apci.DeviceDescriptorResponse):
                 # if response is received IA is occupied
@@ -202,10 +203,22 @@ class ProgDevice:
 
     async def individualaddress_write(self) -> None:
         """Perform a IndividualAddress_Write."""
+        special_connection = await self.xknx.management.register_special()
+        await special_connection._send_data(
+            IndividualAddressWrite(self.ind_add)
+        )
+        
+        #response = await special_connection.request(
+        #    payload=IndividualAddressWrite(self.ind_add),
+        #    expected=apci.IndividualAddressResponse,
+        #)
+        
+        
+        '''
         telegram = Telegram(
             GroupAddress(0),
             TelegramDirection.OUTGOING,
-            IndividualAddressWrite(self.ind_add),
+            
             priority=Priority.SYSTEM,
         )
         await self.xknx.telegrams.put(telegram)
@@ -247,7 +260,7 @@ class ProgDevice:
             raise ManagementConnectionError(
                 f"Received no_ack from sending Telegram: {telegram}"
             )
-        
+        '''
 
     async def memory_read_response(self, address: int = 0, count: int = 0) -> Tuple[int,int,bytes]:
         """Process a DeviceDescriptor_Read_Response."""

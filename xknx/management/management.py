@@ -92,10 +92,10 @@ class Management:
 
         p2p_connection.disconnect_hook = remove_connection_hook
         return p2p_connection
-    async def register_special(self) -> SimpleConnection:
+    async def register_special(self) -> SimpleSendResponse:
         if GroupAddress(0) in self._connections:
-            raise ManagementConnectionError(f"Special Address 0/0/0 already exists.")
-        sc = SimpleConnection(self.xknx)
+            return self._connections[GroupAddress(0)]
+        sc = SimpleSendResponse(self.xknx)
         self._connections[GroupAddress(0)] = sc
         return sc
     
@@ -314,7 +314,9 @@ class P2PConnection:
         await self._send_data(payload)
         return await self._receive(expected)
 
-class SimpleConnection (P2PConnection):
+class SimpleSendResponse (P2PConnection):
+    ''' SimpleSendResponse sends a non connection broadcast request
+        and waits for an answer '''
     def __init__(self, xknx: XKNX):
         self.xknx = xknx
         self._connected = True
@@ -394,8 +396,7 @@ class SimpleConnection (P2PConnection):
             return
         if self._response_waiter.done():
             logger.warning(
-                "Received unexpected point-to-point telegram for %s: %s",
-                self.address,
+                "Received unexpected broadcast response: %s",
                 telegram,
             )
             return
