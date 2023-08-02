@@ -76,85 +76,7 @@ class ProgDevice:
         self.sequence_number = 0
         self.connection_status = ConnectionState.NOT_CONNECTED
         self.p2p_connection = None
-    '''
-    async def process_telegram(self, telegram: Telegram) -> None:
-        """Process a telegram."""
-        self.last_telegram = telegram
-        if telegram.payload:
-            if telegram.payload.CODE == APCIService.DEVICE_DESCRIPTOR_RESPONSE:
-                await self.t_ack()
-            if telegram.payload.CODE == APCIService.MEMORY_RESPONSE:
-                await self.t_ack(True)
-                #self.sequence_number += 1
-            if telegram.payload.CODE == APCIExtendedService.PROPERTY_VALUE_RESPONSE:
-                await self.t_ack(True)
-                #self.sequence_number += 1
-    async def individualaddress_respone(self) -> IndividualAddress | None:
-        """Process a IndividualAddress_Respone."""
-        if self.last_telegram:
-            if self.last_telegram.payload:
-                if (
-                    self.last_telegram.payload.CODE
-                    == APCIService.INDIVIDUAL_ADDRESS_RESPONSE
-                ):
-                    return self.last_telegram.source_address
-        return None
 
-    async def t_connect(self) -> None:
-        """Perform a T_Connect."""
-        telegram = Telegram(
-            self.ind_add, tpci=TConnect()
-        )
-        await self.xknx.telegrams.put(telegram)
-
-    async def t_connect_response(self) -> None:
-        """Process a T_Connect_Response."""
-        await self.t_connect()
-        while True:
-            await asyncio.sleep(0.1)
-            if self.last_telegram:
-                if isinstance(self.last_telegram.tpci, TDisconnect):
-                    return
-
-    async def devicedescriptor_read(self, descriptor: int) -> None:
-        """Perform a DeviceDescriptor_Read."""
-        telegram = Telegram(
-            self.ind_add,
-            TelegramDirection.OUTGOING,
-            DeviceDescriptorRead(descriptor),
-            tpci=TDataConnected(self.sequence_number),
-            priority=Priority.SYSTEM,
-        )
-        self.sequence_number += 1
-        await self.xknx.telegrams.put(telegram)
-
-    async def devicedescriptor_read_response(self, descriptor: int) -> None:
-        """Process a DeviceDescriptor_Read_Response."""
-        await self.devicedescriptor_read(descriptor)
-        while True:
-            await asyncio.sleep(0.1)
-            if self.last_telegram:
-                if self.last_telegram.payload:
-                    if (
-                        self.last_telegram.payload.CODE
-                        == APCIService.DEVICE_DESCRIPTOR_RESPONSE
-                    ):
-                        return
-    async def individualaddress_read(self) -> None:
-        """Perform a IndividualAddress_Read."""
-        telegram = Telegram(
-            GroupAddress(0),
-            TelegramDirection.OUTGOING,
-            IndividualAddressRead(),
-            priority=Priority.SYSTEM,
-        )
-        await self.xknx.telegrams.put(telegram)
-
-
-
-    '''
-
-    ####################################### neu ########################
     async def connect(self) -> bool:
         """Try to establish a connection to device."""
         try:
@@ -207,60 +129,6 @@ class ProgDevice:
         await special_connection._send_data(
             IndividualAddressWrite(self.ind_add)
         )
-        
-        #response = await special_connection.request(
-        #    payload=IndividualAddressWrite(self.ind_add),
-        #    expected=apci.IndividualAddressResponse,
-        #)
-        
-        
-        '''
-        telegram = Telegram(
-            GroupAddress(0),
-            TelegramDirection.OUTGOING,
-            
-            priority=Priority.SYSTEM,
-        )
-        await self.xknx.telegrams.put(telegram)
-
-        ack_waiter = asyncio.get_event_loop().create_future()
-        telegram = Telegram(
-            destination_address=GroupAddress(0),
-            source_address=self.xknx.current_address,
-            payload=IndividualAddressWrite(self.ind_add),
-            priority=Priority.SYSTEM,
-        )
-        try:
-            await self.xknx.cemi_handler.send_telegram(telegram)
-            ack = await asyncio.wait_for(ack_waiter, MANAGAMENT_ACK_TIMEOUT)
-        except asyncio.TimeoutError:
-            logger.info(
-                "%s: timeout while waiting for ACK. Resending Telegram.", self.address
-            )
-            # resend once after 3 seconds without ACK
-            # on timeout the Future is cancelled so create a new
-            ack_waiter = asyncio.get_event_loop().create_future()
-            await self.xknx.cemi_handler.send_telegram(telegram)
-            try:
-                ack = await asyncio.wait_for(self._ack_waiter, MANAGAMENT_ACK_TIMEOUT)
-            except asyncio.TimeoutError:
-                raise ManagementConnectionTimeout(
-                    "No ACK received for repeated telegram."
-                ) from None
-        except ConfirmationError as exc:
-            raise ManagementConnectionError(
-                f"Error while sending Telegram: {exc}"
-            ) from exc
-        except CommunicationError as exc:
-            raise ManagementConnectionError("Error while sending Telegram") from exc
-        finally:
-            ack_waiter = None
-
-        if isinstance(ack, TNak):
-            raise ManagementConnectionError(
-                f"Received no_ack from sending Telegram: {telegram}"
-            )
-        '''
 
     async def memory_read_response(self, address: int = 0, count: int = 0) -> Tuple[int,int,bytes]:
         """Process a DeviceDescriptor_Read_Response."""
@@ -302,7 +170,8 @@ class ProgDevice:
     
     async def t_disconnect(self) -> None:
         """Perform a T_Disconnect."""
-        await self.p2p_connection.disconnect()
+        if self.p2p_connection:
+            await self.p2p_connection.disconnect()
 
 # static fabric method
 async def create_and_connect(
