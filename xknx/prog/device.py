@@ -14,7 +14,7 @@ from xknx.exceptions import (
     ManagementConnectionRefused,
     ManagementConnectionTimeout,
 )
-from xknx.management.management import Management
+from xknx.management.management import Management, P2PConnection
 from xknx.management.management import MANAGAMENT_ACK_TIMEOUT
 from xknx.management.procedures import nm_individual_address_check
 from xknx.telegram import (
@@ -75,7 +75,7 @@ class ProgDevice:
         self.last_telegram: Telegram|None = None
         self.sequence_number = 0
         self.connection_status = ConnectionState.NOT_CONNECTED
-        self.p2p_connection = None
+        self.p2p_connection: P2PConnection|None = None
 
     async def connect(self) -> bool:
         """Try to establish a connection to device."""
@@ -109,7 +109,7 @@ class ProgDevice:
         if self.connection_status == ConnectionState.A_CONNECTED:
             await self.t_disconnect()
 
-    async def individualaddress_read_response(self) -> IndividualAddress | None:
+    async def individualaddress_read_response(self) -> Telegram:
         """Process a IndividualAddress_Read_Response."""
         special_connection = await self.xknx.management.register_special()
         while True:
@@ -132,26 +132,31 @@ class ProgDevice:
 
     async def memory_read_response(self, address: int = 0, count: int = 0) -> Tuple[int,int,bytes]:
         """Process a DeviceDescriptor_Read_Response."""
+        assert self.p2p_connection is not  None
         response = await self.p2p_connection.request(
             payload=MemoryRead(address, count),
             expected=apci.MemoryResponse,
         )
+        pl = response.payload
+        assert isinstance(pl, MemoryResponse)
         return (
-            response.payload.address,
-            response.payload.count,
-            response.payload.data,
+            pl.address,
+            pl.count,
+            pl.data,
         )
 
     async def memory_write(
         self, address: int = 0, count: int = 0, data: bytes = bytes()
     ) -> None:
 
+        assert self.p2p_connection is not  None
         await self.p2p_connection._send_data(
             MemoryWrite(address, data, count),
         )
 
     async def propertyvalue_read(self) -> None:
         """Perform a PropertyValue_Read."""
+        assert self.p2p_connection is not  None
         await self.p2p_connection._send_data(
             PropertyValueRead(0, 0x0B, 1, 1),
         )
@@ -159,6 +164,7 @@ class ProgDevice:
     async def restart(self) -> None:
         """Perform a Restart."""
         # A_Restart will not be ACKed by the device, so it is manually sent to avoid timeout and retry
+        assert self.p2p_connection is not  None
         seq_num = next(self.p2p_connection.sequence_number)
         telegram = Telegram(
             destination_address=self.p2p_connection.address,

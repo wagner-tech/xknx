@@ -6,7 +6,6 @@ Tunnelling requests are used to transmit a KNX telegram within an existing KNX t
 from __future__ import annotations
 
 from xknx.exceptions import CouldNotParseKNXIP
-from xknx.cemi.cemi_frame import CEMIFrame
 
 from .body import KNXIPBody
 from .knxip_enum import KNXIPServiceType
@@ -43,7 +42,6 @@ class TunnellingRequest(KNXIPBody):
         self.sequence_counter = raw[2]
         # raw[3] is reserved
         self.raw_cemi = raw[TunnellingRequest.HEADER_LENGTH :]
-        self.cemi = CEMIFrame.from_knx(self.raw_cemi)
         return len(raw)
 
     def to_knx(self) -> bytes:
@@ -66,6 +64,5 @@ class TunnellingRequest(KNXIPBody):
             "<TunnellingRequest "
             f'communication_channel_id="{self.communication_channel_id}" '
             f'sequence_counter="{self.sequence_counter}" '
-            f'raw_cemi="{self.raw_cemi.hex()}" '
-            #f'cemi="{self.cemi}" />'
+            f'cemi="{self.raw_cemi.hex()}" />'
         )
